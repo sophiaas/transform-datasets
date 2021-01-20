@@ -1,5 +1,6 @@
 import numpy as np
 
+#TODO: Either convert these into proper datasets or delete
 
 def gen_1D_fourier_variant(n_samples, 
                             dim, 
