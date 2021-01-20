@@ -1,7 +1,9 @@
+import torch
 from torch.utils.data import Dataset
 import pandas as pd
 from skimage import transform
 from skimage.transform import EuclideanTransform
+import numpy as np
 
 
 class TranslationMotionMNIST(Dataset):
@@ -17,7 +19,7 @@ class TranslationMotionMNIST(Dataset):
 
         self.dim = 64
         
-        mnist = np.array(pd.read_csv('/home/sanborn/projects/torch-polynomial-nets/datasets/mnist_test.csv'))
+        mnist = np.array(pd.read_csv('~/data/mnist/mnist_test.csv'))
         all_labels = mnist[:, 0]
         label_idxs = {a: np.where(all_labels==a)[0] for a in digits}
         
@@ -118,7 +120,7 @@ class RotationMotionMNIST(Dataset):
 
         self.dim = 64
         
-        mnist = np.array(pd.read_csv('/home/sanborn/projects/torch-polynomial-nets/datasets/mnist_test.csv'))
+        mnist = np.array(pd.read_csv('~/data/mnist_test.csv'))
         all_labels = mnist[:, 0]
         label_idxs = {a: np.where(all_labels==a)[0] for a in digits}
         

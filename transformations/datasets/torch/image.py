@@ -1,9 +1,8 @@
 import numpy as np
 import math
-from nn.utils import one_hot
 import torch
 from torch.utils.data import Dataset
-from data.hierarchical_reflection_group import Reflection
+from transformations.transforms.hierarchical_reflection import Reflection
 from torch.utils.data import DataLoader, SubsetRandomSampler
 import pandas as pd
 import itertools
@@ -172,7 +171,7 @@ class TranslatedMNIST(Dataset):
 
         self.dim = 28 ** 2
         
-        mnist = np.array(pd.read_csv('datasets/mnist_test.csv'))
+        mnist = np.array(pd.read_csv('~/data/mnist/mnist_test.csv'))
         
         all_labels = mnist[:, 0]
         label_idxs = {a: np.where(all_labels==a)[0] for a in digits}
@@ -262,7 +261,7 @@ class RotatedMNIST(Dataset):
         
         self.dim = 28 ** 2
         
-        mnist = np.array(pd.read_csv('datasets/mnist_test.csv'))
+        mnist = np.array(pd.read_csv('~/data/mnist/mnist_test.csv'))
         
         all_labels = mnist[:, 0]
         label_idxs = {a: np.where(all_labels==a)[0] for a in digits}
@@ -301,7 +300,7 @@ class RotatedMNIST(Dataset):
                 for angle in select_rotations:
                     t = transform.rotate(img, angle)
                     t -= t.mean(keepdims=True)
-                    t /= t.std(keep_dims=True)
+                    t /= t.std(keepdims=True)
                     n = np.random.uniform(-noise, noise, size=img.shape)
                     t = t + n
                     data.append(t)
@@ -342,7 +341,7 @@ class Omniglot(Dataset):
        
         np.random.seed(seed)
         
-        omniglot = pd.read_pickle('datasets/omniglot_small')
+        omniglot = pd.read_pickle('~/data/omniglot/omniglot_small.p')
         all_labels = np.array(list(omniglot.labels))
         all_alphabet_labels = np.array(list(omniglot.alphabet_labels))
         imgs = np.array(list(omniglot.imgs))
@@ -445,8 +444,8 @@ class TinyImageNet(Dataset):
     
     def __init__(self,
                  batch_size=32):
-        train_dir = '/home/ssanborn/data/tiny-imagenet-200/train'
-        val_dir = '/home/ssanborn/data/tiny-imagenet-200/val'
+        train_dir = '~/data/tiny-imagenet-200/train'
+        val_dir = '~/data/tiny-imagenet-200/val'
 
         train_dataset = datasets.ImageFolder(train_dir, transform=transforms.ToTensor())
         train_loader = data.DataLoader(train_dataset, batch_size=32)
