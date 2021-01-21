@@ -152,3 +152,53 @@ class HierarchicalReflection(Dataset):
         return len(self.data)
 
     
+def gen_1D_fourier_variant(n_samples, 
+                            dim, 
+                            complex_input=False,
+                            project_input=False,
+                            project_output=False,
+                            variant='fourier', 
+                            standardize=False,
+                            seed=0):
+    
+    #TODO: Either convert this into proper datasets or delete
+
+    
+    np.random.seed(seed)
+    
+    X = np.random.uniform(-1, 1, size=(n_samples, dim))
+    
+    if complex_input:
+        X += 1j * np.random.uniform(-1, 1, size=(n_samples, dim))
+        
+    F = np.fft.fft(X, axis=-1)
+    
+    if complex_input and project_input:
+        X = np.hstack([X.real, X.imag])
+    
+    if variant == 'fourier':
+        if project_output:
+            F = np.hstack([F.real, F.imag])
+        return X, F
+    
+    elif variant == 'power-spectrum':
+        PS = np.abs(F) ** 2
+        return X, PS
+    
+    elif variant == 'bispectrum':
+        B = []
+        for f in F:
+            b = np.zeros(dim + 1, dtype=np.complex)
+            b[0] = np.conj(f[0] * f[0]) * f[0]
+            b[1:-1] = np.conj(f[:-1] * f[1]) * f[1:]
+            b[dim] = np.conj(f[dim - 1] * f[1]) * f[0]
+            B.append(b)
+        B = np.array(B)
+        if project_output:
+            B = np.hstack([B.real, B.imag])
+        return X, B
+    
+    else:
+        raise ValueError('Invalid dataset type')
+
+    

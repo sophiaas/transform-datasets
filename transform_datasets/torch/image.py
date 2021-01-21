@@ -5,6 +5,7 @@ from torch.utils.data import DataLoader
 import pandas as pd
 import itertools
 from skimage import transform
+from harmonics.spectral.wavelets import 
 
 
 class TranslatedMNIST(Dataset):
