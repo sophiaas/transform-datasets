@@ -5,10 +5,12 @@ from torch.utils.data import DataLoader
 import pandas as pd
 import itertools
 from skimage import transform
-from harmonics.spectral.wavelets import 
+# from harmonics.spectral.wavelets import 
 
 
 class TranslatedMNIST(Dataset):
+    
+    #TODO: make unraveled version
     
     def __init__(self,
                  exemplars_per_digit,
@@ -154,7 +156,10 @@ class RotatedMNIST(Dataset):
                     t /= t.std(keepdims=True)
                     n = np.random.uniform(-noise, noise, size=img.shape)
                     t = t + n
-                    data.append(t)
+                    if ravel:
+                        data.append(t.ravel())
+                    else:
+                        data.append(t)
                     labels.append(l)
                     exemplar_labels.append(ex_idx)
                     
