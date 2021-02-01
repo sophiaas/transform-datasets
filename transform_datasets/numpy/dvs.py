@@ -127,7 +127,7 @@ def erase_hot_pixels(x, y=None, t=None, p=None, flow=None, img_size=(260, 346), 
         return x_, y_, t_, p_
             
         
-def dvs_to_vid(x, y=None, t=None, p=None, frame_rate=120, img_size=(260, 346)):
+def dvs_to_vid(x, y=None, t=None, p=None, frame_rate=120, img_size=(260, 346), normalize=True):
     if y is None:
         y = x[:, 1]
         t = x[:, 2]
@@ -140,16 +140,20 @@ def dvs_to_vid(x, y=None, t=None, p=None, frame_rate=120, img_size=(260, 346)):
     max_idx = len(t)
     idx = 0
     for s in np.arange(start, end, 1/frame_rate):
+        n_events = 0
         if t[idx] >= s and t[idx] < s + 1/frame_rate:
             in_timestep = True
             img = np.zeros(img_size)
             while in_timestep:
                 img[int(y[idx]), int(x[idx])] += p[idx]
                 idx += 1
+                n_events += 1
                 if idx == max_idx:
                     break
                 if t[idx] >= s + 1/frame_rate:
                     in_timestep = False
+        if normalize:
+            img /= n_events
         if idx == max_idx:
             break
         projections.append(img)
@@ -166,8 +170,8 @@ class DVSMotion20(object):
                  n_stds=5
                  ):
 
-        filename = '/home/ssanborn/data/DVSMOTION20/camera-motion-data/{}_sequence/events.npy'.format(sequence)
-        of_filename = '/home/ssanborn/data/DVSMOTION20/camera-motion-data/{}_sequence/optic_flow.npy'.format(sequence)
+        filename = '/home/ssanborn/data/DVSMOTION20/camera-motion-data/{}_sequence/events_clean.npy'.format(sequence)
+        of_filename = '/home/ssanborn/data/DVSMOTION20/camera-motion-data/{}_sequence/optic_flow_clean.npy'.format(sequence)
         
         self.img_size = (260, 346)
         
@@ -185,6 +189,15 @@ class DVSMotion20(object):
         
         if clean:
             self.x, self.y, self.t, self.p, self.optic_flow = erase_hot_pixels(self.x, self.y, self.t, self.p, self.optic_flow)
+            
+    def project(self, frame_rate):
+        projected_vid = dvs_to_vid(x=self.x, 
+                                   y=self.y, 
+                                   t=self.t, 
+                                   p=self.p, 
+                                   frame_rate=frame_rate, 
+                                   img_size=self.img_size)
+        return projected_vid
         
     @property
     def pos(self):
