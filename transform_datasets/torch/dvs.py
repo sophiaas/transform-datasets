@@ -3,6 +3,7 @@ from torch.utils.data import Dataset
 import numpy as np
 from transform_datasets.numpy.dvs import collapse_data, get_hot_pixels, erase_hot_pixels
 from transform_datasets.numpy.dvs import dvs_to_vid as dvs_to_vid_numpy
+import os
 
 
 def dvs_to_vid(x, y=None, t=None, p=None, frame_rate=120, img_size=(260, 346)):
@@ -23,6 +24,40 @@ def dvs_to_vid(x, y=None, t=None, p=None, frame_rate=120, img_size=(260, 346)):
     return torch.tensor(projections)
 
 
+class DVS(Dataset):
+    
+    def project(self, frame_rate):
+        projected_vid = dvs_to_vid(x=self.x, 
+                                   y=self.y, 
+                                   t=self.t, 
+                                   p=self.p, 
+                                   frame_rate=frame_rate, 
+                                   img_size=self.img_size)
+        return projected_vid
+
+    @property
+    def pos(self):
+        return torch.vstack([self.x, self.y, self.t]).T
+    
+    @property
+    def data(self):
+        return self.x, self.y, self.t, self.p
+    
+    def __getitem__(self, idx, flow=False):
+        x = self.x[idx]
+        y = self.y[idx]
+        t = self.t[idx]
+        p = self.p[idx]
+        if flow:
+            flow = self.optic_flow[idx]
+            return x, y, t, p, flow
+        else:
+            return x, y, t, p
+    
+    def __len__(self):
+        return len(self.x) 
+    
+
 class DVSMotion20(Dataset):
     
     def __init__(self,
@@ -33,8 +68,8 @@ class DVSMotion20(Dataset):
                  n_stds=5
                  ):
 
-        filename = '/home/ssanborn/data/DVSMOTION20/camera-motion-data/{}_sequence/events_clean.npy'.format(sequence)
-        of_filename = '/home/ssanborn/data/DVSMOTION20/camera-motion-data/{}_sequence/optic_flow_clean.npy'.format(sequence)
+        filename = os.path.expanduser('~/data/DVSMOTION20/camera-motion-data/{}_sequence/events_clean.npy').format(sequence)
+        of_filename = os.path.expanduser('~/data/DVSMOTION20/camera-motion-data/{}_sequence/optic_flow_clean.npy').format(sequence)
         
         self.img_size = (260, 346)
         
@@ -59,173 +94,55 @@ class DVSMotion20(Dataset):
         self.p = torch.tensor(p)
         self.optic_flow = torch.tensor(optic_flow)
         
-    def project(self, frame_rate):
-        projected_vid = dvs_to_vid(x=self.x, 
-                                   y=self.y, 
-                                   t=self.t, 
-                                   p=self.p, 
-                                   frame_rate=frame_rate, 
-                                   img_size=self.img_size)
-        return projected_vid
-        
-    @property
-    def pos(self):
-        return torch.vstack([self.x, self.y, self.t]).T
-    
-    @property
-    def data(self):
-        return self.x, self.y, self.t, self.p
 
-    def __getitem__(self, idx, flow=False):
-        x = self.x[idx]
-        y = self.y[idx]
-        t = self.t[idx]
-        p = self.p[idx]
-        if flow:
-            flow = self.optic_flow[idx]
-            return x, y, t, p, flow
-        else:
-            return x, y, t, p
-    
-    def __len__(self):
-        return len(self.x)
-    
-    
-# TODO: Convert to ordinary pytorch dataset
-import os
-import h5py
-import numpy as np
-import torch
-from torch_geometric.data import Data, Dataset
-import pdb
-from data.preprocessing import NormalizeRanges
-from tqdm import tqdm
-
-
-class MVSEC(Dataset):
+class MVSEC(DVS):
     def __init__(self, 
-                 root,
-                 filename,
-                 data_phase='train',
-                 sample_timesteps=100,
-                 sample_patchsize=(20, 20),
-                 img_size=(346, 260),
-                 pre_transform=NormalizeRanges((1, 20))):
+                 start=0,
+                 n_events=None,
+                 sequence='indoor_flying',
+                 sequence_number=3,
+                 clean=False):
 
-#                  stride = 15,
+        filename = os.path.expanduser('~/data/MVSEC/{}/{}{}_data.hdf5').format(sequence, sequence, sequence_number)
+        of_filename = os.path.expanduser('~/data/MVSEC/{}/{}{}_gt_flow_dist.npz').format(sequence, sequence, sequence_number)
+        
+        self.img_size = (260, 346)
+        
+        with h5py.File(filename, 'r') as f:
+            # TODO: Include right also?
+            events = f['davis']['left']['events'][1:]
+        
+            x = events[:, 0]
+            y = events[:, 1]
+            t = events[:, 2] # seconds
+            p = events[:, 3]        
+
+        if n_events is None:
+            n_events = len(x)
             
-        np.random.seed(0)
-        self.root = root
-        self.filename = filename
+        x = x[start:start+n_events]
+        y = y[start:start+n_events]
+        t = t[start:start+n_events]
+        p = p[start:start+n_events]
         
-        self.sample_timesteps = sample_timesteps
-        self.sample_patchsize = sample_patchsize
-        self.data_phase = data_phase
-        self.pre_transform = pre_transform
-#         self.stride = stride
-        self.img_size = img_size
+        t = t - t[0] # convert to reasonable range
         
-        super().__init__(self.root, pre_transform=self.pre_transform)
+        #TODO: extract only slice of flow if n_events is not None
+        f = np.load(of_filename)
+        flow_t = f['timestamps'] #seconds
+        flow_x = f['x_flow_dist']
+        flow_y = f['y_flow_dist']
         
-    @property
-    def raw_file_names(self):
-        path = os.path.join(self.root, self.filename)
-        return path
-    
-    @property
-    def processed_dir(self):
-        return os.path.join(self.root, 'processed')
+        flow_t = flow_t - flow_t[0]
+                    
+        if clean:
+            x, y, t, p = erase_hot_pixels(x, y, t, p)
+                        
+        self.x = x
+        self.y = y
+        self.t = t
+        self.p = p
         
-    @property
-    def processed_file_names(self):
-#         self.n_datapoints = len(len(os.listdir(self.processed_dir)) - 1)
-#         self.n_datapoints = 44891 # (20, 20, 500)
-#         self.n_datapoints = 31423 # (20, 20, 1000)
-#         self.n_datapoints = 25622 # ? (20, 20, 1000)
-        self.n_datapoints = len(os.listdir(self.processed_dir)) - 2
-        idxs = np.arange(self.n_datapoints)
-        np.random.shuffle(idxs)
-        
-        n_train = int(self.n_datapoints * 0.7)
-        n_validate = int(self.n_datapoints * 0.1)
-        n_test = int(self.n_datapoints * 0.2)
-        
-        self.train_idxs = idxs[:n_train]
-        self.validation_idxs = idxs[n_train:n_train+n_validate]
-        self.test_idxs = idxs[n_train+n_validate:n_train+n_validate+n_test]
-        
-        if self.data_phase == "train":
-            return ['data_{}.pt'.format(x) for x in self.train_idxs]
-        elif self.data_phase == "validation":
-            return ['data_{}.pt'.format(x) for x in self.validation_idxs]
-        elif self.data_phase == "test":
-            return ['data_{}.pt'.format(x) for x in self.test_idxs]
-    
-    def process(self):
-        f = h5py.File(os.path.join(self.root, self.filename), 'r')
-        
-        events = f['davis']['left']['events'][1:]
-        
-        x = events[:, 0]
-        y = events[:, 1]
-        
-        t = events[:, 2]
-        t -= t.min()
-        t *= 10 ** 4
-        
-        p = events[:, 3]
-        p = p.astype(np.int32)
-        
-        i = 0
-        
-        max_timestep = t[-1]
-
-        pos = np.vstack([x, y, t]).astype(np.float32).T
-
-        for j in tqdm(range(int(max_timestep) // self.sample_timesteps)):
-            if j * self.sample_timesteps < 50000:
-                continue
-            else:
-                a = pos[:, 2] > j * self.sample_timesteps
-                b = pos[:, 2] <= (j + 1) * self.sample_timesteps
-                idx = a * b
-                pos_crop = pos[idx]
-                pol_crop = p[idx]
-                if len(pos_crop) > 0:
-                    pos_crop[:, 2] -= pos_crop[0, 2]
-
-                    for x in range(self.img_size[0] // self.sample_patchsize[0]):
-                        for y in range(self.img_size[1] // self.sample_patchsize[1]):
-                            c = pos_crop[:, 0] > x * self.sample_patchsize[0]
-                            d = pos_crop[:, 0] <= (x + 1) * self.sample_patchsize[0]
-                            e = pos_crop[:, 1] > y * self.sample_patchsize[1]
-                            f = pos_crop[:, 1] <= (y + 1) * self.sample_patchsize[1]
-
-                            idx = c * d * e * f
-
-                            pos_patch = pos_crop[idx]
-                            pol_patch = pol_crop[idx]
-                            
-                            if sum(abs(pol_patch)) < 20:
-                                continue
-                                
-                            else:
-                                pos_patch[:, 0] -= x * self.sample_patchsize[0]
-                                pos_patch[:, 1] -= y * self.sample_patchsize[1]
-
-                                data = Data(x=torch.tensor(pol_patch, dtype=torch.float32),
-                                         pos=torch.tensor(pos_patch, dtype=torch.float32))
-                                
-                                if self.pre_transform is not None:
-                                    data = self.pre_transform(data)
-
-                                torch.save(data, os.path.join(self.processed_dir, 'data_{}.pt'.format(i)))
-                                i += 1
-                                
-    def len(self):
-        return len(self.processed_file_names)
-
-    def get(self, idx):
-        data = torch.load(os.path.join(self.processed_dir, 'data_{}.pt'.format(idx)))
-        return data
-    
+        self.flow_x = flow_x
+        self.flow_y = flow_y
+        self.flow_t = flow_t 

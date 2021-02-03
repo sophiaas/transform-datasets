@@ -87,7 +87,7 @@ def erase_hot_pixels(x, y=None, t=None, p=None, flow=None, img_size=(260, 346), 
         x = x[:, 0]
         
     hot_pixels = get_hot_pixels(x, y, t, p, img_size, n_stds)
-    print(len(hot_pixels))
+    print('n hot pixels: {}'.format(len(hot_pixels)))
     x_, y_, t_, p_ = [], [], [], []
     
     if flow is not None:
