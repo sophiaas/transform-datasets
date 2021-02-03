@@ -22,9 +22,8 @@ class TranslationMotionGabors(Dataset):
                  seed = 0):
        
         #TODO: Try also using 3d gabors
-        
+        self.name = 'translated-motion-gabors'
         np.random.seed(seed)
-
         self.dim = 64
 
         basis = gen_gabor_basis(size=filter_size,
@@ -104,8 +103,8 @@ class TranslationMotionMNIST(Dataset):
                  max_translation=40,
                  seed = 0):
        
+        self.name = 'translated-motion-mnist'
         np.random.seed(seed)
-
         self.dim = 128
         
         mnist = np.array(pd.read_csv('~/data/mnist/mnist_test.csv'))
@@ -205,8 +204,8 @@ class RotationMotionMNIST(Dataset):
                  max_translation=20,
                  seed = 0):
        
+        self.name = 'rotation-motion-mnist'
         np.random.seed(seed)
-
         self.dim = 64
         
         mnist = np.array(pd.read_csv('~/data/mnist/mnist_test.csv'))

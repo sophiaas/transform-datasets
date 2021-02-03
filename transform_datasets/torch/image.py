@@ -20,8 +20,8 @@ class TranslatedMNIST(Dataset):
                  noise = 0.1,
                  seed = 0):
        
+        self.name = 'translated-mnist'
         np.random.seed(seed)
-
         self.dim = 28 ** 2
         
         mnist = np.array(pd.read_csv('~/data/mnist/mnist_test.csv'))
@@ -110,8 +110,8 @@ class RotatedMNIST(Dataset):
                  seed = 0,
                  ravel=False):
 
+        self.name = 'rotated-mnist'
         np.random.seed(seed)
-        
         self.dim = 28 ** 2
         
         mnist = np.array(pd.read_csv('~/data/mnist/mnist_test.csv'))
@@ -195,6 +195,7 @@ class Omniglot(Dataset):
                  seed=0,
                  ravel=False):
        
+        self.name = 'omniglot'
         np.random.seed(seed)
         
         omniglot = pd.read_pickle('~/data/omniglot/omniglot_small.p')
@@ -248,6 +249,7 @@ class TinyImageNet(Dataset):
     
     def __init__(self,
                  batch_size=32):
+        self.name = 'tiny-imagenet'
         train_dir = '~/data/tiny-imagenet-200/train'
         val_dir = '~/data/tiny-imagenet-200/val'
 
