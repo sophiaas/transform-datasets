@@ -5,6 +5,7 @@ from torch.utils.data import DataLoader
 import pandas as pd
 import itertools
 from skimage import transform
+import torchvision
 # from harmonics.spectral.wavelets import 
 
 
@@ -248,10 +249,174 @@ class Omniglot(Dataset):
 class TinyImageNet(Dataset):
     
     def __init__(self,
-                 batch_size=32):
+                 batch_size=32,
+                 train=True):
         self.name = 'tiny-imagenet'
-        train_dir = '~/data/tiny-imagenet-200/train'
-        val_dir = '~/data/tiny-imagenet-200/val'
+        if train:
+            folder = '~/data/tiny-imagenet-200/train'
+        else:
+            folder = '~/data/tiny-imagenet-200/val'
 
-        train_dataset = datasets.ImageFolder(train_dir, transform=transforms.ToTensor())
-        train_loader = data.DataLoader(train_dataset, batch_size=32)
+        self.data = torchvision.datasets.ImageFolder(folder, transform=torchvision.transforms.ToTensor())
+        
+    def __getitem__(self, idx):
+        x, y = self.data[idx]
+        return x, y
+    
+    def __len__(self):
+        return len(self.data)
+    
+    
+class RotatedMNIST(Dataset):
+    
+    def __init__(self,
+                 exemplars_per_digit,
+                 digits=np.arange(10),
+                 percent_transformations=0.3,
+                 noise = 0.1,
+                 seed = 0,
+                 ravel=False):
+
+        self.name = 'rotated-mnist'
+        np.random.seed(seed)
+        self.dim = 28 ** 2
+        
+        mnist = np.array(pd.read_csv('~/data/mnist/mnist_test.csv'))
+        
+        all_labels = mnist[:, 0]
+        label_idxs = {a: np.where(all_labels==a)[0] for a in digits}
+
+        mnist = mnist[:, 1:]
+        mnist = mnist / 255
+        #TODO: VERIFY NORMALIZATION WITH ROTATION BORDERS
+#         mnist = mnist - mnist.mean(axis=1, keepdims=True)
+#         mnist = mnist / mnist.std(axis=1, keepdims=True)
+        mnist = mnist.reshape((len(mnist), 28, 28))
+        
+        n_rotations = int(359 * percent_transformations)
+        all_rotations = np.arange(360)
+        
+        data = []
+        labels = []
+        exemplar_labels = []
+        
+        ex_idx = 0
+        
+        for number in digits:
+            # Select digits
+            idxs = np.random.choice(label_idxs[number], 
+                                    exemplars_per_digit, 
+                                    replace=False)
+            
+            # Rotate exemplars + Add noise
+            for idx in idxs:
+                img = mnist[idx]
+                l = all_labels[idx]
+                
+                # Select rotations
+#                 np.random.shuffle(all_rotations)
+                select_rotations = all_rotations[:n_rotations]
+
+                for angle in select_rotations:
+                    t = transform.rotate(img, angle)
+                    t -= t.mean(keepdims=True)
+                    t /= t.std(keepdims=True)
+                    n = np.random.uniform(-noise, noise, size=img.shape)
+                    t = t + n
+                    if ravel:
+                        data.append(t.ravel())
+                    else:
+                        data.append(t)
+                    labels.append(l)
+                    exemplar_labels.append(ex_idx)
+                    
+                ex_idx += 1
+
+
+                    
+        data = np.array(data)
+        if not ravel:
+            self.channels = 1
+            data = data.reshape((data.shape[0], 1, 28, 28))
+        self.data = torch.Tensor(data)
+        self.labels = labels
+        self.exemplar_labels = exemplar_labels
+        self.exemplars_per_digit = exemplars_per_digit
+
+    def __getitem__(self, idx):
+        x = self.data[idx]
+        y = self.labels[idx]
+        return x, y
+
+    def __len__(self):
+        return len(self.data)
+    
+    
+
+class NORB(Dataset):
+    
+    def __init__(self,
+                 camera='left',
+                 label='category',
+                 test=False,
+                 normalize=True,
+                 seed=0,
+                 ravel=True):
+       
+        self.name = 'norb'
+        np.random.seed(seed)
+        
+        if test:
+            df = pd.read_csv('~/data/NORB/test.csv')
+            
+        else:
+            df = pd.read_csv('~/data/NORB/train.csv')
+            
+        if camera == 'left':
+            self.data = torch.tensor(list(df['image1']))
+            
+        elif camera == 'right':
+            self.data = torch.tensor(list(df['image2']))
+            
+        elif camera == 'both':
+            raise NotImplementedError
+            
+        else:
+            raise ValueError("camera must be one of [left, right, both]")
+            
+        self.azimuth = torch.tensor(list(df.azimuth))
+        self.category = torch.tensor(list(df.category))
+        self.elevation = torch.tensor(list(df.elevation))
+        self.lighting = torch.tensor(list(df.lighting))
+        
+        if label == 'category':
+            self.labels = self.category
+            
+        elif label == 'azimuth':
+            self.labels = self.azimuth
+            
+        elif label =='elevation':
+            self.labels = self.elevation
+            
+        elif label == 'lighting':
+            self.labels = self.lighting
+            
+        if ravel:
+            self.data = self.data.reshape((self.data.shape[0], -1))
+            
+        # TODO: Make this valid by using the same mean and std over train and test data
+        if normalize:
+            self.data = self.data - self.data.mean()
+            self.data = self.data / self.data.std()
+
+        
+    def __getitem__(self, idx):
+        x = self.data[idx]
+        y = self.labels[idx]
+        return x, y
+
+    
+    def __len__(self):
+        return len(self.data)
+    
+    
