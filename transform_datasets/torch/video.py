@@ -5,6 +5,7 @@ from skimage import transform
 from skimage.transform import EuclideanTransform
 import numpy as np
 from harmonics.spectral.wavelets import gen_gabor_basis
+from PIL import Image
 
 
 class TranslationMotionGabors(Dataset):
@@ -119,9 +120,7 @@ class TranslationMotionMNIST(Dataset):
         mnist = mnist / 255
         mnist = mnist - mnist.mean(axis=(1,2), keepdims=True)
         mnist = mnist / mnist.std(axis=(1,2), keepdims=True)
-        
-
-        
+           
         start_x = np.random.randint(-max_translation, max_translation, size=len(digits)*exemplars_per_digit)
         start_y = np.random.randint(-max_translation, max_translation, size=len(digits)*exemplars_per_digit)
         end_x = np.random.randint(-max_translation, max_translation, size=len(digits)*exemplars_per_digit)
@@ -269,6 +268,113 @@ class RotationMotionMNIST(Dataset):
         self.labels = labels
         self.exemplar_labels = exemplar_labels
         self.exemplars_per_digit = exemplars_per_digit
+
+    def __getitem__(self, idx):
+        x = self.data[idx]
+        y = self.labels[idx]
+        return x, y
+
+    def __len__(self):
+        return len(self.data)
+    
+    
+class NaturalTranslatingPatches(Dataset):
+    
+    """
+    Makes videos of patches linearly sweeping over large images. 
+    """
+    
+    def __init__(self,
+                 patches_per_image=10,
+                 patch_size=16,
+                 n_frames=10,
+                 images=range(98),
+                 max_translation=10,
+                 color=False,
+                 normalize_imgs=True,
+                 normalize_vids=True,
+                 min_contrast=0.2,
+                 seed=0):
+       
+        self.name = 'natural-images-translating-patches'
+        np.random.seed(seed)
+        img_shape = (512, 512)
+        self.dim = patch_size ** 2
+
+        directory = os.path.expanduser("~/data/curated-natural-images/images/")
+
+
+        data = []
+        exemplar_labels = []
+        translation = []
+        
+        i = 0
+        
+        for idx in images:
+            n_zeros = 4 - len(str(idx))
+            str_idx = "0" * n_zeros + str(idx)
+            img = np.asarray(Image.open(directory+"{}.png".format(str_idx)))
+            
+            if not color:
+                img = img.mean(axis=-1)
+                
+            if normalize_imgs:
+                img -= img.mean()
+                img /= img.std()
+                
+            for p in range(patches_per_image):
+                
+                low_contrast = True
+                while low_contrast:
+                    start_x = np.random.randint(0, img_shape[1] - patch_size)
+                    start_y = np.random.randint(0, img_shape[0] - patch_size)
+                    start_patch = img[start_y:start_y+patch_size, start_x:start_x+patch_size]                
+
+
+                    x_lower_bound = max(0, start_x - max_translation)
+                    y_lower_bound = max(0, start_y - max_translation)
+
+                    x_upper_bound = min(start_x + max_translation, img_shape[1] - patch_size)
+                    y_upper_bound = min(start_y + max_translation, img_shape[0] - patch_size)
+
+                    end_x = np.random.randint(x_lower_bound, x_upper_bound)
+                    end_y = np.random.randint(y_lower_bound, y_upper_bound)
+
+                    x_trajectory = np.linspace(start_x, end_x, n_frames)
+                    y_trajectory = np.linspace(start_y, end_y, n_frames)
+
+                    x_trajectory = [round(a) for a in x_trajectory]
+                    y_trajectory = [round(a) for a in y_trajectory]
+                    
+                    frames = []
+                    stds = []
+                    
+                    frames.append(start_patch)
+                    stds.append(start_patch.std())
+                    
+                    for j in range(1, n_frames):
+                        next_img = img[y_trajectory[j]:y_trajectory[j]+patch_size, x_trajectory[j]:x_trajectory[j]+patch_size]
+                        frames.append(next_img)
+                        stds.append(next_img.std())
+                        
+                    if np.mean(stds) >= min_contrast:
+                        low_contrast = False
+                        
+                if normalize_vids:
+                    frames = [x - np.mean(frames) for x in frames]
+                    frames = [x / np.std(frames) for x in frames]
+                    
+                vid = np.array(frames)
+                data.append(vid)
+                translation.append([(start_x, start_y), (end_x, end_y)])
+                exemplar_labels.append(i)
+                
+                i += 1
+                    
+        data = np.array(data)
+        self.data = torch.Tensor(data)
+        self.exemplar_labels = exemplar_labels
+        self.patches_per_image = patches_per_image
 
     def __getitem__(self, idx):
         x = self.data[idx]
