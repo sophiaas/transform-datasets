@@ -2,7 +2,7 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 
-# from harmonics.groups.hierarchical_reflection import Reflection
+from harmonics.groups.hierarchical_reflection import Reflection
 
 
 class Translation(Dataset):
