@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 from torch.utils.data import Dataset
+
 from harmonics.groups.hierarchical_reflection import Reflection
 
 
@@ -11,7 +12,9 @@ class Translation(Dataset):
 
         np.random.seed(seed)
 
-        random_classes = np.random.uniform(-1, 1, size=(n_classes, dim))
+        random_classes = np.random.uniform(
+            -1, 1, size=(n_classes, dim - max_transformation_steps * 2)
+        )
         random_classes -= np.mean(random_classes, axis=1, keepdims=True)
         dataset, labels, transformations = [], [], []
 
@@ -23,7 +26,7 @@ class Translation(Dataset):
                 transformations.append(t)
 
                 # Negative translation
-                datapoint = translate(c, -t, max_transformation_steps)
+                datapoint = self.translate(c, -t, max_transformation_steps)
                 dataset.append(datapoint)
                 labels.append(i)
                 transformations.append(-t)
