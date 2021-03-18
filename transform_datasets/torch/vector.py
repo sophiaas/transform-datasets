@@ -16,7 +16,7 @@ class Translation(Dataset):
                 
         np.random.seed(seed)
 
-        random_classes = np.random.uniform(-1, 1, size=(n_classes, dim))
+        random_classes = np.random.uniform(-1, 1, size=(n_classes, dim - max_transformation_steps * 2))
         random_classes -= np.mean(random_classes, axis=1, keepdims=True)
         dataset, labels, transformations = [], [], []
 
