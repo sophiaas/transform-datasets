@@ -11,11 +11,13 @@ class Translation(Dataset):
     ):
 
         np.random.seed(seed)
-
+        
         random_classes = np.random.uniform(
             -1, 1, size=(n_classes, dim - max_transformation_steps * 2)
         )
         random_classes -= np.mean(random_classes, axis=1, keepdims=True)
+        random_classes /= np.std(random_classes, axis=1, keepdims=True)
+        
         dataset, labels, transformations = [], [], []
 
         for i, c in enumerate(random_classes):
@@ -72,11 +74,11 @@ class CyclicTranslation(Dataset):
 
         all_transformations = np.arange(dim)
         n_transformations = int(percent_transformations * len(all_transformations))
-        if not ordered:
-            np.random.shuffle(all_transformations)
-        select_transformations = all_transformations[:n_transformations]
 
         for i, c in enumerate(random_classes):
+            if not ordered:
+                np.random.shuffle(all_transformations)
+            select_transformations = all_transformations[:n_transformations]
             for t in select_transformations:
                 datapoint = self.translate(c, t)
                 n = np.random.uniform(-noise, noise, size=dim)
@@ -88,8 +90,12 @@ class CyclicTranslation(Dataset):
         self.data = torch.Tensor(dataset)
         self.labels = torch.Tensor(labels)
         self.transformation = torch.Tensor(transformations)
-        self.dim = self.data.shape[1]
+        self.dim = dim
         self.n_classes = n_classes
+        self.noise = noise
+        self.seed = seed
+        self.percent_transformations = percent_transformations
+        self.ordered = ordered
 
     def translate(self, x, t):
         new_x = list(x)
