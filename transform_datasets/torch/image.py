@@ -14,6 +14,7 @@ from PIL import Image
 
 # TODO: super init everything
 
+
 class Cyclic2DTranslation(Dataset):
     def __init__(
         self,
@@ -31,7 +32,7 @@ class Cyclic2DTranslation(Dataset):
         random_classes -= np.mean(random_classes, axis=(1, 2), keepdims=True)
         random_classes /= np.std(random_classes, axis=(1, 2), keepdims=True)
         dataset, labels, transformations = [], [], []
-        
+
         all_transformations = list(
             itertools.product(
                 np.arange(dim[0]),
@@ -41,7 +42,6 @@ class Cyclic2DTranslation(Dataset):
 
         n_transformations = int(len(all_transformations) * percent_transformations)
 
-
         for i, c in enumerate(random_classes):
             if not ordered:
                 np.random.shuffle(all_transformations)
@@ -50,7 +50,7 @@ class Cyclic2DTranslation(Dataset):
                 datapoint = self.translate(c, h, v)
                 n = np.random.uniform(-noise, noise, size=dim)
                 datapoint += n
-                
+
                 if vectorized:
                     datapoint = datapoint.ravel()
 
@@ -88,9 +88,9 @@ class Cyclic2DTranslation(Dataset):
 
     def __len__(self):
         return len(self.data)
-    
-    
-class D42D(Dataset):
+
+
+class C42D(Dataset):
     def __init__(
         self,
         n_classes=500,
@@ -99,15 +99,15 @@ class D42D(Dataset):
         seed=0,
         vectorized=True,
         ordered=False,
-        n_repeats=50
+        n_repeats=50,
     ):
         np.random.seed(seed)
-        self.name = "d4-2d"
+        self.name = "c4-2d"
         random_classes = np.random.uniform(-1, 1, size=(n_classes,) + dim)
         random_classes -= np.mean(random_classes, axis=(1, 2), keepdims=True)
         random_classes /= np.std(random_classes, axis=(1, 2), keepdims=True)
         dataset, labels, transformations = [], [], []
-        
+
         all_transformations = [0, 1, 2, 3] * n_repeats
 
         for i, c in enumerate(random_classes):
@@ -117,7 +117,7 @@ class D42D(Dataset):
                 datapoint = np.rot90(c, t)
                 n = np.random.uniform(-noise, noise, size=dim)
                 datapoint += n
-                
+
                 if vectorized:
                     datapoint = datapoint.ravel()
 
@@ -397,18 +397,20 @@ class Omniglot(Dataset):
 
     def __len__(self):
         return len(self.data)
-    
+
+
 class SinusoidSums2D(Dataset):
-    
-    def __init__(self,
-                 img_size=(16, 16),
-                 n_classes=100,
-                 n_sinusoids=5,
-                 max_frequency=5,
-                 complex_valued=False,
-                 vectorized=True,
-                 seed=0):
-        
+    def __init__(
+        self,
+        img_size=(16, 16),
+        n_classes=100,
+        n_sinusoids=5,
+        max_frequency=5,
+        complex_valued=False,
+        vectorized=True,
+        seed=0,
+    ):
+
         self.img_size = img_size
         self.n_sinusoids = n_sinusoids
         self.max_frequency = max_frequency
@@ -416,9 +418,9 @@ class SinusoidSums2D(Dataset):
         self.vectorized = vectorized
         self.n_classes = n_classes
         self.seed = seed
-        
+
         np.random.seed(seed)
-        
+
         data = []
         labels = []
         for n in range(n_classes):
@@ -433,15 +435,12 @@ class SinusoidSums2D(Dataset):
                 img = img.ravel()
             labels.append(n)
             data.append(img)
-            
+
         self.data = torch.Tensor(data)
         self.labels = torch.Tensor(labels)
-        
-    def get_sinusoid(self,
-                     orientation,
-                     frequency,
-                     phase):
-        
+
+    def get_sinusoid(self, orientation, frequency, phase):
+
         dh = np.linspace(0, 1, self.img_size[1], endpoint=True)
         dv = np.linspace(0, 1, self.img_size[0], endpoint=True)
 
@@ -451,13 +450,13 @@ class SinusoidSums2D(Dataset):
         fv = frequency * np.sin(orientation) * 2 * np.pi
 
         sinusoid = np.cos(ihs * fh + ivs * fv + phase)
-        
+
         if self.complex_valued:
             c = np.sin(ihs * fh + ivs * fv + phase)
             sinusoid = sinusoid + 1j * c
-        
+
         return sinusoid
-    
+
     def __getitem__(self, idx):
         x = self.data[idx]
         y = self.labels[idx]
@@ -466,34 +465,36 @@ class SinusoidSums2D(Dataset):
     def __len__(self):
         return len(self.data)
 
-    
+
 class RotatedSinusoidSums2D(SinusoidSums2D):
-    
-    def __init__(self,
-                 img_size=(16, 16),
-                 n_classes=100,
-                 n_sinusoids=5,
-                 max_frequency=5,
-                 complex_valued=False,
-                 percent_transformations=1.0,
-                 vectorized=True,
-                 n_repeats=1,
-                 ordered=False,
-                 noise=0.0,
-                 circle_crop=True,
-                 seed=0,
-                 name='rotated-sinusoid-sums-2d',
-                 equivariant=False,
-                 ):
-        
-        super().__init__(img_size, 
-                         n_classes=n_classes, 
-                         n_sinusoids=n_sinusoids, 
-                         max_frequency=max_frequency, 
-                         complex_valued=complex_valued, 
-                         vectorized=False,
-                         seed=seed)
-        
+    def __init__(
+        self,
+        img_size=(16, 16),
+        n_classes=100,
+        n_sinusoids=5,
+        max_frequency=5,
+        complex_valued=False,
+        percent_transformations=1.0,
+        vectorized=True,
+        n_repeats=1,
+        ordered=False,
+        noise=0.0,
+        circle_crop=True,
+        seed=0,
+        name="rotated-sinusoid-sums-2d",
+        equivariant=False,
+    ):
+
+        super().__init__(
+            img_size,
+            n_classes=n_classes,
+            n_sinusoids=n_sinusoids,
+            max_frequency=max_frequency,
+            complex_valued=complex_valued,
+            vectorized=False,
+            seed=seed,
+        )
+
         self.ordered = ordered
         self.percent_transformations = percent_transformations
         self.n_repeats = n_repeats
@@ -503,15 +504,19 @@ class RotatedSinusoidSums2D(SinusoidSums2D):
         self.name = name
         self.vectorized = vectorized
         self.equivariant = equivariant
-        
+
         n_rotations = int(359 * percent_transformations)
         all_rotations = np.arange(360)
-        
+
         if circle_crop:
             if img_size[0] % 2 == 0 or img_size[1] % 2 == 0:
-                raise ValueError("Image size should be a tuple of odd numbers to ensure centered rotational symmetry.")
-            v, h = np.mgrid[:img_size[0], :img_size[1]]
-            equation = (v - ((img_size[0] - 1) / 2 )) ** 2 + (h - ((img_size[1] - 1)  / 2 )) ** 2
+                raise ValueError(
+                    "Image size should be a tuple of odd numbers to ensure centered rotational symmetry."
+                )
+            v, h = np.mgrid[: img_size[0], : img_size[1]]
+            equation = (v - ((img_size[0] - 1) / 2)) ** 2 + (
+                h - ((img_size[1] - 1) / 2)
+            ) ** 2
             circle = equation < (equation.max() / 2)
 
         data = []
@@ -519,7 +524,7 @@ class RotatedSinusoidSums2D(SinusoidSums2D):
         s = []
         if equivariant:
             x0 = []
-        
+
         for i, img in enumerate(self.data):
 
             # Select rotations
@@ -541,20 +546,20 @@ class RotatedSinusoidSums2D(SinusoidSums2D):
                     else:
                         data.append(t)
                     labels.append(self.labels[i])
-                    s.append(angle / 360.0) # NB: Might want to center at 0
+                    s.append(angle / 360.0)  # NB: Might want to center at 0
                     if equivariant:
                         if vectorized:
                             x0.append(img.reshape(-1))
                         else:
                             x0.append(img)
-                    
+
         self.data = torch.Tensor(data)
         self.labels = torch.Tensor(labels)
         self.s = torch.Tensor(s)
         if equivariant:
             self.x0 = x0
 
-    def __getitem__(self, idx):            
+    def __getitem__(self, idx):
         x = self.data[idx]
         y = self.labels[idx]
         if self.equivariant:
@@ -568,8 +573,6 @@ class RotatedSinusoidSums2D(SinusoidSums2D):
         return len(self.data)
 
 
-    
-    
 class RotatedOmniglot(Dataset):
     def __init__(
         self,
@@ -581,7 +584,7 @@ class RotatedOmniglot(Dataset):
         ordered=False,
         noise=0.0,
         n_repeats=10,
-        percent_transformations=1.0
+        percent_transformations=1.0,
     ):
 
         self.name = "omniglot"
@@ -594,7 +597,7 @@ class RotatedOmniglot(Dataset):
         imgs = imgs.reshape((imgs.shape[0], 30, 30))
 
         alphabet_idxs = {a: np.where(all_alphabet_labels == a)[0] for a in alphabets}
-        
+
         n_rotations = int(359 * percent_transformations)
         all_rotations = np.arange(360)
 
@@ -613,7 +616,7 @@ class RotatedOmniglot(Dataset):
                 exemplars = cs[start:end]
                 ex_ls = ls[start:end]
                 ex_als = als[start:end]
-                
+
                 for i, img in enumerate(exemplars):
                     # Select rotations
                     if not ordered:
@@ -655,7 +658,7 @@ class RotatedOmniglot(Dataset):
         self.percent_transformations = percent_transformations
         self.seed = seed
         self.noise = noise
-        
+
     def __getitem__(self, idx):
         x = self.data[idx]
         y = self.labels[idx]
