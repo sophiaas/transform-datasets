@@ -429,8 +429,9 @@ class SinusoidSums2D(Dataset):
                 orientation = np.random.uniform(-np.pi, np.pi)
                 frequency = np.random.uniform(0, max_frequency)
                 phase = np.random.uniform(-np.pi, np.pi)
+                amplitude = np.random.uniform(-1, 1)
                 sinusoid = self.get_sinusoid(orientation, frequency, phase)
-                img += sinusoid
+                img += amplitude * sinusoid
             if self.vectorized:
                 img = img.ravel()
             labels.append(n)
@@ -549,7 +550,9 @@ class RotatedSinusoidSums2D(SinusoidSums2D):
                     s.append(angle / 360.0)  # NB: Might want to center at 0
                     if equivariant:
                         if vectorized:
-                            x0.append(img.reshape(-1))
+                            x0_crop = img.copy()
+                            x0_crop[~circle] = 0.0
+                            x0.append(x0_crop)
                         else:
                             x0.append(img)
 
