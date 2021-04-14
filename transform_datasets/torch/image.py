@@ -549,12 +549,14 @@ class RotatedSinusoidSums2D(SinusoidSums2D):
                     labels.append(self.labels[i])
                     s.append(angle / 360.0)  # NB: Might want to center at 0
                     if equivariant:
-                        if vectorized:
-                            x0_crop = img.copy()
-                            x0_crop[~circle] = 0.0
-                            x0.append(x0_crop)
+                        if circle_crop:
+                            canonical_img = img.clone()
+                            canonical_img[~circle] = 0.0       
                         else:
-                            x0.append(img)
+                            canonical_img = img
+                        if vectorized:
+                            canonical_img = canonical_img.ravel()
+                        x0.append(canonical_img)
 
         self.data = torch.Tensor(data)
         self.labels = torch.Tensor(labels)
