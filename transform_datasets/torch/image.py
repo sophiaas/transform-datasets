@@ -9,11 +9,151 @@ import torchvision
 import pickle
 import os
 from PIL import Image
+from tqdm import tqdm
 
-# from harmonics.spectral.wavelets import
+class HarmonicPatternsS1xS1(Dataset):
+    
+    def __init__(self,
+                 img_size=32, #ASSUMES SQUARE
+                 n_classes=10,
+                 n_harmonics=5,
+                 max_frequency=16,
+                 seed=0,
+                 ravel=True,
+                 real=True):
+        
+        super().__init__()
+        np.random.seed(seed)
+        self.name = 'oscillations-s1xs1'
+        self.img_size = (img_size, img_size)
+        self.img_side = img_size
+        if ravel:
+            self.dim = img_size ** 2
+        else:
+            self.dim = self.img_size
+        self.max_frequency = max_frequency
+        self.n_classes = n_classes
+        self.seed = seed
+        self.ravel = ravel
+        self.real = real
+        self.n_harmonics = n_harmonics
+        
+        self.coordinates = np.linspace(0, np.pi * 2, self.img_side, endpoint=False)
+        self.grid_h, self.grid_v = np.meshgrid(self.coordinates, self.coordinates)
+        self.gen_dataset()
 
-# TODO: super init everything
+    def gen_dataset(self):
+        data = []
+        labels = []
+        for c in range(self.n_classes):
+            d = self.random_signal()
+            if self.ravel:
+                d = d.ravel()
+            data.append(d)
+            labels.append(c)
+        self.data = torch.tensor(np.array(data))
+        self.labels = torch.tensor(labels)
+        
+    def random_signal(self):
+        d = np.zeros(self.img_size, dtype=np.complex64)
+        for i in range(self.n_harmonics):
+            omega_h, omega_v = np.random.randint(-self.max_frequency, self.max_frequency + 1), np.random.randint(-self.max_frequency, self.max_frequency + 1)
+            phase_h, phase_v = np.random.randint(self.img_side), np.random.randint(self.img_side)
+            amplitude = np.random.uniform(0, 1)
+            coords_h, coords_v = self.translate(self.grid_h, phase_h, phase_v), self.translate(self.grid_v, phase_h, phase_v)
+            f = np.cos(coords_h * omega_h + coords_v * omega_v) + 1j * np.sin(coords_h * omega_h + coords_v * omega_v)
+            d += f
+        if self.real:
+            d = d.real
+        d -= np.mean(d)
+        d /= np.max(abs(d))
+        return d
 
+    def translate(self, img, h=0, v=0):
+        new_img = np.zeros_like(img)
+        for i in range(img.shape[0]):
+            for j in range(img.shape[1]):
+                oldi = (i - v) % img.shape[0]
+                oldj = (j - h) % img.shape[1]
+                new_img[i, j] = img[oldi, oldj]
+        return new_img
+    
+    def __getitem__(self, idx):
+        x = self.data[idx]
+        y = self.labels[idx]
+        return x, y
+
+    def __len__(self):
+        return len(self.data)
+
+    
+class HarmonicPatternsS1xS1Orbit(HarmonicPatternsS1xS1):
+    
+    def __init__(self,
+                 img_size=32,
+                 n_classes=10,
+                 n_harmonics=5,
+                 max_frequency=16,
+                 percent_transformations=1.0,
+                 seed=0,
+                 ordered=False,
+                 ravel=True,
+                 real=True,
+                 equivariant=False):
+        
+        self.percent_transformations = percent_transformations
+        self.ordered = ordered
+        self.n_transformations = int(img_size ** 2 * percent_transformations)
+        self.equivariant = equivariant
+        
+        super().__init__(img_size=img_size,
+                         n_classes=n_classes,
+                         n_harmonics=n_harmonics,
+                         max_frequency=max_frequency,
+                         seed=seed,
+                         ravel=ravel,
+                         real=real)
+        
+        self.name = 'oscillations-s1xs1-orbit'
+        
+    def gen_dataset(self):
+        data = []
+        labels = []
+        for c in range(self.n_classes):
+            signal = self.random_signal()
+            orbit = self.gen_orbit(signal)
+            if self.ravel:
+                orbit = [x.ravel() for x in orbit]
+            data += orbit  
+            labels += [c] * len(orbit)
+        self.data = torch.tensor(np.array(data))
+        self.labels = torch.tensor(labels)
+        
+    def gen_orbit(self, signal):
+        orbit = []
+        
+        all_transformations = list(
+            itertools.product(
+                np.arange(self.img_side),
+                np.arange(self.img_side),
+            )
+        )
+        if not self.ordered:
+             np.random.shuffle(all_transformations)
+        select_transformations = all_transformations[:self.n_transformations]
+        for g1, g2 in select_transformations:
+            signal_t = self.translate(signal, g1, g2)
+            orbit.append(signal_t) 
+        return orbit
+    
+    def __getitem__(self, idx):
+        x = self.data[idx]
+        y = self.labels[idx]
+        return x, y
+
+    def __len__(self):
+        return len(self.data)
+    
 
 class Cyclic2DTranslation(Dataset):
     def __init__(
@@ -101,6 +241,9 @@ class C42D(Dataset):
         ordered=False,
         n_repeats=50,
     ):
+        
+        super().__init__()
+
         np.random.seed(seed)
         self.name = "c4-2d"
         random_classes = np.random.uniform(-1, 1, size=(n_classes,) + dim)
@@ -159,6 +302,8 @@ class TranslatedMNIST(Dataset):
         noise=0.1,
         seed=0,
     ):
+
+        super().__init__()
 
         self.name = "translated-mnist"
         np.random.seed(seed)
@@ -255,6 +400,8 @@ class RotatedMNIST(Dataset):
         ravel=True,
     ):
 
+        super().__init__()
+
         self.name = "rotated-mnist"
         self.dim = 28 ** 2
         self.exemplars_per_digit = exemplars_per_digit
@@ -349,6 +496,8 @@ class Omniglot(Dataset):
         ravel=False,
     ):
 
+        super().__init__()
+
         self.name = "omniglot"
         np.random.seed(seed)
 
@@ -410,6 +559,8 @@ class SinusoidSums2D(Dataset):
         vectorized=True,
         seed=0,
     ):
+        
+        super().__init__()
 
         self.img_size = img_size
         self.n_sinusoids = n_sinusoids
@@ -485,6 +636,7 @@ class RotatedSinusoidSums2D(SinusoidSums2D):
         name="rotated-sinusoid-sums-2d",
         equivariant=False,
     ):
+        
 
         super().__init__(
             img_size,
@@ -592,6 +744,8 @@ class RotatedOmniglot(Dataset):
         percent_transformations=1.0,
     ):
 
+        super().__init__()
+
         self.name = "omniglot"
         np.random.seed(seed)
 
@@ -675,6 +829,8 @@ class RotatedOmniglot(Dataset):
 
 class TinyImageNet(Dataset):
     def __init__(self, batch_size=32, train=True):
+        super().__init__()
+
         self.name = "tiny-imagenet"
         if train:
             folder = "~/data/tiny-imagenet-200/train"
@@ -705,6 +861,8 @@ class NORB(Dataset):
         ravel=True,
         seed=0,
     ):
+
+        super().__init__()
 
         self.name = "norb"
         np.random.seed(seed)
@@ -919,6 +1077,8 @@ class NaturalCyclicTranslatingPatches(Dataset):
         ravel=True,
     ):
 
+        super().__init__()
+
         self.name = "natural-cyclic-translating-patches"
         np.random.seed(seed)
         img_shape = (512, 512)
@@ -1051,6 +1211,8 @@ class NaturalTranslatingPatches(Dataset):
         seed=0,
         ravel=True,
     ):
+
+        super().__init__()
 
         self.name = "natural-images-translating-patches"
         np.random.seed(seed)

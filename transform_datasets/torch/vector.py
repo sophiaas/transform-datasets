@@ -5,6 +5,128 @@ from torch.utils.data import Dataset
 from harmonics.groups.hierarchical_reflection import Reflection
 
 
+class HarmonicPatternsS1(Dataset):
+    
+    def __init__(self,
+                 dim=32,
+                 n_classes=10,
+                 n_harmonics=5,
+                 max_frequency=16,
+                 seed=0,
+                 real=True):
+        
+        super().__init__()
+        np.random.seed(seed)
+        self.dim = dim
+        self.n_classes = n_classes
+        self.n_harmonics = n_harmonics
+        self.max_frequency = max_frequency
+        self.seed = seed
+        self.real = real
+
+        self.name = "harmonic-patterns-s1"
+        self.coordinates = np.arange(0, np.pi * 2, np.pi * 2 / dim)
+        self.gen_dataset()
+        
+    def gen_dataset(self):
+        data = []
+        labels = []
+        for c in range(self.n_classes):
+            d = self.random_signal()
+            data.append(d)
+            labels.append(c)
+        self.data = torch.tensor(np.array(data))
+        self.labels = torch.tensor(labels)
+        
+    def random_signal(self):
+        d = np.zeros(self.dim, dtype=np.complex64)
+        for i in range(self.n_harmonics):
+            omega = np.random.randint(self.max_frequency + 1)
+            phase = np.random.randint(self.dim)
+            amplitude = np.random.uniform(0, 1)
+            coords = self.translate(self.coordinates, phase)
+            f = amplitude * np.exp(1j * omega * coords)
+            d += f
+        if self.real:
+            d = d.real
+        d -= np.mean(d)
+        d /= np.max(abs(d))
+        return d
+
+    def translate(self, x, t):
+        new_x = list(x)
+        for i in range(t):
+            last = new_x.pop()
+            new_x = [last] + new_x
+        return np.array(new_x)
+    
+    def __getitem__(self, idx):
+        x = self.data[idx]
+        y = self.labels[idx]
+        return x, y
+
+    def __len__(self):
+        return len(self.data)
+    
+    
+class HarmonicPatternsS1Orbit(HarmonicPatternsS1):
+    
+    def __init__(self,
+                 dim=32,
+                 n_classes=10,
+                 n_harmonics=5,
+                 percent_transformations=1.0,
+                 ordered=False,
+                 max_frequency=16,
+                 seed=0,
+                 real=True,
+                 equivariant=False):
+        
+        self.percent_transformations = percent_transformations
+        self.n_transformations = int(dim * percent_transformations)
+        self.ordered = ordered
+        self.equivariant = equivariant
+        
+        super().__init__(dim=dim,
+                         n_classes=n_classes,
+                         n_harmonics=n_harmonics,
+                         max_frequency=max_frequency,
+                         seed=seed,
+                         real=real)
+        
+        self.name = 'harmonic-patterns-s1-orbit'
+        
+    def gen_dataset(self):
+        data = []
+        labels = []
+        for c in range(self.n_classes):
+            signal = self.random_signal()
+            orbit = self.gen_orbit(signal)
+            data += orbit  
+            labels += [c] * len(orbit)
+        self.data = torch.tensor(np.array(data))
+        self.labels = torch.tensor(labels)
+        
+    def gen_orbit(self, signal):
+        orbit = []
+        all_transformations = np.arange(self.dim)
+        if not self.ordered:
+             np.random.shuffle(all_transformations)
+        select_transformations = all_transformations[:self.n_transformations]
+        for g in select_transformations:
+            signal_t = self.translate(signal, g)
+            orbit.append(signal_t) 
+        return orbit
+    
+    def __getitem__(self, idx):
+        x = self.data[idx]
+        y = self.labels[idx]
+        return x, y
+
+    def __len__(self):
+        return len(self.data)
+
+
 class Translation(Dataset):
     def __init__(
         self, n_classes=100, max_transformation_steps=10, dim=25, noise=0.2, seed=0
