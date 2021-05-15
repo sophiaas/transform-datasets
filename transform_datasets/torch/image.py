@@ -42,8 +42,7 @@ class DiskHarmonicPatterns(Dataset):
         self.seed = seed
         self.gen_dataset()
     
-    @staticmethod
-    def disk_harmonic(n, m, r, theta, mmax = 12):
+    def disk_harmonic(self,n, m, r, theta, mmax = 12):
         """
         Calculate the displacement of the drum membrane at (r, theta; t=0)
         in the normal mode described by integers n >= 0, 0 < m <= mmax.
@@ -53,8 +52,7 @@ class DiskHarmonicPatterns(Dataset):
         k = jn_zeros(n, mmax+1)[m]
         return np.sin(n*theta) * jn(n, r*k)
 
-    @staticmethod
-    def generate_harmonic_image(n, m, rot, im_size=100):
+    def generate_harmonic_image(self, n, m, rot, im_size=100):
         # Create arrays of cartesian co-ordinates (x, y)
         x = np.linspace(-1, 1, im_size)
         y = np.linspace(-1, 1, im_size)
@@ -70,16 +68,15 @@ class DiskHarmonicPatterns(Dataset):
         within_disk = np.abs(r) <=1
 
         theta = theta - rot
-        z = disk_harmonic(n, m, r, theta)
+        z = self.disk_harmonic(n, m, r, theta)
         z[~within_disk] = 0
 
         return z, within_disk
 
-    @staticmethod
-    def generate_linear_combination(nm_terms, coefficients, phases, im_size=100):
+    def generate_linear_combination(self, nm_terms, coefficients, phases, im_size=100):
         total_image = np.zeros((im_size,im_size))
         for (n,m),coeff,phase in zip(nm_terms,coefficients,phases):
-            z, idxs = generate_harmonic_image(n,m,phase,im_size=im_size)
+            z, idxs = self.generate_harmonic_image(n,m,phase,im_size=im_size)
             total_image += coeff*z
 
         # Normalize
@@ -89,18 +86,16 @@ class DiskHarmonicPatterns(Dataset):
 
         return total_image
     
-    @staticmethod
-    def gen_rotated_images(nm_terms, coeffs, phases, n_rotations=60, im_size=80):
+    def gen_rotated_images(self, nm_terms, coeffs, phases, n_rotations=60, im_size=80):
         rotations = 2*np.pi*np.linspace(0,1,n_rotations)
         images = np.empty((len(rotations),im_size,im_size))
         for i, rot in enumerate(rotations):
-            total_image = generate_linear_combination(nm_terms,coeffs,phases - rot,im_size=im_size)
+            total_image = self.generate_linear_combination(nm_terms,coeffs,phases - rot,im_size=im_size)
             images[i] = total_image
         images = torch.Tensor(images)
         return images
     
-    @staticmethod
-    def gen_image_classes_with_rotation(n_classes=10, n_rotations=60, im_size=80, mmax=5):
+    def gen_image_classes_with_rotation(self, n_classes=10, n_rotations=60, im_size=80, mmax=5):
         n_freqs = list(range(1,mmax))
         m_freqs = list(range(0,mmax))
         nm_terms = list(product(n_freqs,m_freqs))
@@ -111,7 +106,7 @@ class DiskHarmonicPatterns(Dataset):
             coeffs = 2*np.random.rand(len(nm_terms)) - 1
             phases = 2*np.pi*np.random.rand(len(nm_terms))
 
-            rot_images = gen_rotated_images(nm_terms, coeffs, phases, n_rotations = n_rotations, im_size=im_size)
+            rot_images = self.gen_rotated_images(nm_terms, coeffs, phases, n_rotations = n_rotations, im_size=im_size)
             labels = torch.Tensor([i]*n_rotations)
 
             X = torch.cat([X,rot_images],dim = 0)
@@ -121,7 +116,7 @@ class DiskHarmonicPatterns(Dataset):
 
 
     def gen_dataset(self):
-        self.data, self.labels = gen_image_classes_with_rotation(self.n_classes, self.n_rotations, self.img_size, self.mmax)
+        self.data, self.labels = self.gen_image_classes_with_rotation(self.n_classes, self.n_rotations, self.img_size, self.mmax)
         if self.ravel:
             n_images = self.data.shape[0]
             self.data = self.data.reshape(n_images,-1)
