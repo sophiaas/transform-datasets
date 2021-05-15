@@ -10,6 +10,130 @@ import pickle
 import os
 from PIL import Image
 from tqdm import tqdm
+from itertools import product 
+from scipy.special import jn, yn, jn_zeros, yn_zeros
+    
+    
+class DiskHarmonicPatterns(Dataset):
+    '''
+    Dataset of (rotated) linear combinations of disk harmonics.
+    https://www.teachme.codes/scipy-tutorials/Bessel/Bessel/
+    '''
+    def __init__(self,
+                 img_size=32, #ASSUMES SQUARE
+                 n_classes=10,
+                 n_rotations = 20,
+                 mmax=6,
+                 ravel=True,
+                 seed=0):
+        
+        super().__init__()
+        np.random.seed(seed)
+        self.name = 'disk_harmonics'
+        self.img_size = img_size
+        self.ravel = ravel
+        if self.ravel:
+            self.dim = self.img_size ** 2
+        else:
+            self.dim = self.img_size
+        self.mmax = mmax
+        self.n_classes = n_classes
+        self.n_rotations = n_rotations
+        self.seed = seed
+        self.gen_dataset()
+    
+    @staticmethod
+    def disk_harmonic(n, m, r, theta, mmax = 12):
+        """
+        Calculate the displacement of the drum membrane at (r, theta; t=0)
+        in the normal mode described by integers n >= 0, 0 < m <= mmax.
+
+        """
+        # Pick off the mth zero of Bessel function Jn
+        k = jn_zeros(n, mmax+1)[m]
+        return np.sin(n*theta) * jn(n, r*k)
+
+    @staticmethod
+    def generate_harmonic_image(n, m, rot, im_size=100):
+        # Create arrays of cartesian co-ordinates (x, y)
+        x = np.linspace(-1, 1, im_size)
+        y = np.linspace(-1, 1, im_size)
+        xx, yy = np.meshgrid(x, y)
+
+        # Convert to polar coordinates (x,y) -> (r,theta)
+        c = xx + 1j * yy
+        polar2z = lambda r,theta: r * np.exp( 1j * theta )
+        z2polar = lambda z: ( np.abs(z), np.angle(z) )
+        r, theta = z2polar(c)
+
+        # Get indices of points within the unit disk
+        within_disk = np.abs(r) <=1
+
+        theta = theta - rot
+        z = disk_harmonic(n, m, r, theta)
+        z[~within_disk] = 0
+
+        return z, within_disk
+
+    @staticmethod
+    def generate_linear_combination(nm_terms, coefficients, phases, im_size=100):
+        total_image = np.zeros((im_size,im_size))
+        for (n,m),coeff,phase in zip(nm_terms,coefficients,phases):
+            z, idxs = generate_harmonic_image(n,m,phase,im_size=im_size)
+            total_image += coeff*z
+
+        # Normalize
+        total_image = total_image
+        largest_abs_term = max(abs(total_image.min()),abs(total_image.max()))
+        total_image = total_image/largest_abs_term
+
+        return total_image
+    
+    @staticmethod
+    def gen_rotated_images(nm_terms, coeffs, phases, n_rotations=60, im_size=80):
+        rotations = 2*np.pi*np.linspace(0,1,n_rotations)
+        images = np.empty((len(rotations),im_size,im_size))
+        for i, rot in enumerate(rotations):
+            total_image = generate_linear_combination(nm_terms,coeffs,phases - rot,im_size=im_size)
+            images[i] = total_image
+        images = torch.Tensor(images)
+        return images
+    
+    @staticmethod
+    def gen_image_classes_with_rotation(n_classes=10, n_rotations=60, im_size=80, mmax=5):
+        n_freqs = list(range(1,mmax))
+        m_freqs = list(range(0,mmax))
+        nm_terms = list(product(n_freqs,m_freqs))
+
+        X = torch.Tensor()
+        Y = torch.Tensor()
+        for i in range(n_classes):
+            coeffs = 2*np.random.rand(len(nm_terms)) - 1
+            phases = 2*np.pi*np.random.rand(len(nm_terms))
+
+            rot_images = gen_rotated_images(nm_terms, coeffs, phases, n_rotations = n_rotations, im_size=im_size)
+            labels = torch.Tensor([i]*n_rotations)
+
+            X = torch.cat([X,rot_images],dim = 0)
+            Y = torch.cat([Y,labels],dim = 0)
+
+        return X,Y
+
+
+    def gen_dataset(self):
+        self.data, self.labels = gen_image_classes_with_rotation(self.n_classes, self.n_rotations, self.img_size, self.mmax)
+        if self.ravel:
+            n_images = self.data.shape[0]
+            self.data = self.data.reshape(n_images,-1)
+    
+    def __getitem__(self, idx):
+        x = self.data[idx]
+        y = self.labels[idx]
+        return x, y
+
+    def __len__(self):
+        return len(self.data)
+    
 
 class HarmonicPatternsS1xS1(Dataset):
     
