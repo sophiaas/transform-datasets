@@ -12,7 +12,7 @@ from PIL import Image
 from tqdm import tqdm
 from itertools import product 
 from scipy.special import jn, yn, jn_zeros, yn_zeros
-    
+import random
     
 class DiskHarmonicPatterns(Dataset):
     '''
@@ -74,6 +74,7 @@ class DiskHarmonicPatterns(Dataset):
         return z, within_disk
 
     def generate_linear_combination(self, nm_terms, coefficients, phases, im_size=100):
+        eps = 1e-7
         total_image = np.zeros((im_size,im_size))
         for (n,m),coeff,phase in zip(nm_terms,coefficients,phases):
             z, idxs = self.generate_harmonic_image(n,m,phase,im_size=im_size)
@@ -81,9 +82,9 @@ class DiskHarmonicPatterns(Dataset):
 
         # Normalize
         total_image = total_image
-        largest_abs_term = max(abs(total_image.min()),abs(total_image.max()))
-        total_image = total_image/largest_abs_term
-
+        width = np.abs(total_image.max() - total_image.min())
+#         import pdb; pdb.set_trace()
+        total_image = (total_image - np.mean(total_image))/(width + eps)
         return total_image
     
     def gen_rotated_images(self, nm_terms, coeffs, phases, n_rotations=60, im_size=80):
@@ -103,8 +104,10 @@ class DiskHarmonicPatterns(Dataset):
         X = torch.Tensor()
         Y = torch.Tensor()
         for i in range(n_classes):
-            coeffs = 2*np.random.rand(len(nm_terms)) - 1
-            phases = 2*np.pi*np.random.rand(len(nm_terms))
+            num_terms = np.random.randint(1,len(nm_terms))
+            nm_terms_sample = random.sample(nm_terms,num_terms)
+            coeffs = 2*np.random.rand(len(nm_terms_sample)) - 1
+            phases = 2*np.pi*np.random.rand(len(nm_terms_sample))
 
             rot_images = self.gen_rotated_images(nm_terms, coeffs, phases, n_rotations = n_rotations, im_size=im_size)
             labels = torch.Tensor([i]*n_rotations)
