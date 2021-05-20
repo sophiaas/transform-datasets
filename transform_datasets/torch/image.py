@@ -13,6 +13,7 @@ from tqdm import tqdm
 from itertools import product 
 from scipy.special import jn, yn, jn_zeros, yn_zeros
 import random
+
     
 class DiskHarmonicPatterns(Dataset):
     '''
@@ -23,19 +24,22 @@ class DiskHarmonicPatterns(Dataset):
                  img_size=32, #ASSUMES SQUARE
                  n_classes=10,
                  n_rotations = 20,
-                 mmax=6,
+                 n_basis_el=6,
+                 mmax=13,
                  ravel=True,
                  seed=0):
         
         super().__init__()
         np.random.seed(seed)
         self.name = 'disk_harmonics'
-        self.img_size = img_size
+        self.img_size = (img_size, img_size)
+        self.img_side = img_size
         self.ravel = ravel
         if self.ravel:
-            self.dim = self.img_size ** 2
+            self.dim = self.img_side ** 2
         else:
-            self.dim = self.img_size
+            self.dim = self.img_side
+        self.n_basis_el = n_basis_el
         self.mmax = mmax
         self.n_classes = n_classes
         self.n_rotations = n_rotations
@@ -96,7 +100,7 @@ class DiskHarmonicPatterns(Dataset):
         images = torch.Tensor(images)
         return images
     
-    def gen_image_classes_with_rotation(self, n_classes=10, n_rotations=60, im_size=80, mmax=5):
+    def gen_image_classes_with_rotation(self, n_classes=10, n_rotations=60, im_size=80, n_basis_el=6, mmax=13):
         n_freqs = list(range(1,mmax))
         m_freqs = list(range(0,mmax))
         nm_terms = list(product(n_freqs,m_freqs))
@@ -104,12 +108,11 @@ class DiskHarmonicPatterns(Dataset):
         X = torch.Tensor()
         Y = torch.Tensor()
         for i in range(n_classes):
-            num_terms = np.random.randint(1,len(nm_terms))
-            nm_terms_sample = random.sample(nm_terms,num_terms)
+            nm_terms_sample = random.sample(nm_terms,n_basis_el)
             coeffs = 2*np.random.rand(len(nm_terms_sample)) - 1
             phases = 2*np.pi*np.random.rand(len(nm_terms_sample))
 
-            rot_images = self.gen_rotated_images(nm_terms, coeffs, phases, n_rotations = n_rotations, im_size=im_size)
+            rot_images = self.gen_rotated_images(nm_terms_sample, coeffs, phases, n_rotations = n_rotations, im_size=im_size)
             labels = torch.Tensor([i]*n_rotations)
 
             X = torch.cat([X,rot_images],dim = 0)
@@ -119,7 +122,7 @@ class DiskHarmonicPatterns(Dataset):
 
 
     def gen_dataset(self):
-        self.data, self.labels = self.gen_image_classes_with_rotation(self.n_classes, self.n_rotations, self.img_size, self.mmax)
+        self.data, self.labels = self.gen_image_classes_with_rotation(self.n_classes, self.n_rotations, self.img_side, self.n_basis_el, self.mmax)
         if self.ravel:
             n_images = self.data.shape[0]
             self.data = self.data.reshape(n_images,-1)
