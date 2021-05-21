@@ -412,6 +412,53 @@ class C42D(Dataset):
     def __len__(self):
         return len(self.data)
 
+    
+class MNIST(Dataset):
+
+    def __init__(
+        self,
+        test=False,
+        ordered=False
+    ):
+
+        super().__init__()
+
+        self.name = "mnist"
+        self.dim = 28 ** 2
+        self.img_size = (28, 28)
+        self.test = test
+        self.ordered = ordered
+
+        if test:
+            mnist = np.array(pd.read_csv("/home/sanborn/datasets/mnist/mnist_test.csv"))
+        else:
+            mnist = np.array(pd.read_csv("/home/sanborn/datasets/mnist/mnist_test.csv"))
+
+        labels = mnist[:, 0]
+        mnist = mnist[:, 1:]
+        mnist = mnist / 255
+        mnist = mnist - mnist.mean(axis=1, keepdims=True)
+        mnist = mnist / mnist.std(axis=1, keepdims=True)
+#         mnist = mnist.reshape((len(mnist), 28, 28))
+
+        if ordered:
+            sort_idx = np.argsort(labels)
+            mnist = mnist[sort_idx]
+            labels = labels[sort_idx]
+            
+        self.data = torch.Tensor(mnist)
+        self.labels = torch.Tensor(labels)
+
+
+    def __getitem__(self, idx):
+        x = self.data[idx]
+        y = self.labels[idx]
+        return x, y
+
+    def __len__(self):
+        return len(self.data)
+    
+    
 
 class TranslatedMNIST(Dataset):
 
@@ -516,9 +563,10 @@ class RotatedMNIST(Dataset):
     def __init__(
         self,
         exemplars_per_digit,
+        test=False,
         digits=np.arange(10),
         percent_transformations=1.0,
-        noise=0.1,
+        noise=0.0,
         seed=0,
         n_repeats=50,
         ordered=False,
@@ -529,6 +577,7 @@ class RotatedMNIST(Dataset):
 
         self.name = "rotated-mnist"
         self.dim = 28 ** 2
+        self.img_size = (28, 28)
         self.exemplars_per_digit = exemplars_per_digit
         self.digits = digits
         self.percent_transformations = percent_transformations
@@ -536,10 +585,14 @@ class RotatedMNIST(Dataset):
         self.seed = seed
         self.ordered = ordered
         self.ravel = ravel
+        self.test = test
 
         np.random.seed(seed)
 
-        mnist = np.array(pd.read_csv("~/data/mnist/mnist_test.csv"))
+        if test:
+            mnist = np.array(pd.read_csv("/home/sanborn/datasets/mnist/mnist_test.csv"))
+        else:
+            mnist = np.array(pd.read_csv("/home/sanborn/datasets/mnist/mnist_train.csv"))
 
         all_labels = mnist[:, 0]
         label_idxs = {a: np.where(all_labels == a)[0] for a in digits}
@@ -577,18 +630,16 @@ class RotatedMNIST(Dataset):
                 select_rotations = all_rotations[:n_rotations]
 
                 for angle in select_rotations:
-                    for r in range(n_repeats):
-                        t = transform.rotate(img, angle)
-                        t -= t.mean(keepdims=True)
-                        t /= t.std(keepdims=True)
-                        n = np.random.uniform(-noise, noise, size=img.shape)
-                        t = t + n
-                        if ravel:
-                            data.append(t.ravel())
-                        else:
-                            data.append(t)
-                        labels.append(l)
-                        exemplar_labels.append(ex_idx)
+                    t = transform.rotate(img, angle)
+                    t -= t.mean(keepdims=True)
+                    t /= t.std(keepdims=True)
+                    n = np.random.uniform(-noise, noise, size=img.shape)
+                    t = t + n
+                    if ravel:
+                        t = t.ravel()
+                    data += [t] * n_repeats
+                    labels += [l] * n_repeats
+                    exemplar_labels.append(ex_idx)
 
                 ex_idx += 1
 
@@ -601,68 +652,6 @@ class RotatedMNIST(Dataset):
         self.exemplar_labels = exemplar_labels
         self.exemplars_per_digit = exemplars_per_digit
         self.n_repeats = n_repeats
-
-    def __getitem__(self, idx):
-        x = self.data[idx]
-        y = self.labels[idx]
-        return x, y
-
-    def __len__(self):
-        return len(self.data)
-
-
-class Omniglot(Dataset):
-    def __init__(
-        self,
-        exemplars_per_character,
-        characters=np.arange(10),
-        alphabets=np.arange(15),
-        seed=0,
-        ravel=False,
-    ):
-
-        super().__init__()
-
-        self.name = "omniglot"
-        np.random.seed(seed)
-
-        omniglot = pd.read_pickle("~/data/omniglot/omniglot_small.p")
-        all_labels = np.array(list(omniglot.labels))
-        all_alphabet_labels = np.array(list(omniglot.alphabet_labels))
-        imgs = np.array(list(omniglot.imgs))
-
-        alphabet_idxs = {a: np.where(all_alphabet_labels == a)[0] for a in alphabets}
-
-        data = []
-        labels = []
-        alphabet_labels = []
-
-        for alphabet in alphabets:
-            cs = imgs[alphabet_idxs[alphabet]]
-            ls = all_labels[alphabet_idxs[alphabet]]
-            als = all_alphabet_labels[alphabet_idxs[alphabet]]
-            start = 0
-            for c in characters:
-                start = c * 20
-                end = start + exemplars_per_character
-                exemplars = cs[start:end]
-                ex_ls = ls[start:end]
-                ex_als = als[start:end]
-
-                data += list(exemplars)
-                labels += list(ex_ls)
-                alphabet_labels += list(ex_als)
-                start += 20
-
-        data = np.array(data)
-        self.dim = 900
-        if not ravel:
-            self.channels = 1
-            data = data.reshape((data.shape[0], 1, 30, 30))
-        self.data = torch.Tensor(data)
-        self.labels = labels
-        self.alphabet_labels = alphabet_labels
-        self.exemplars_per_character = exemplars_per_character
 
     def __getitem__(self, idx):
         x = self.data[idx]
@@ -853,95 +842,112 @@ class RotatedSinusoidSums2D(SinusoidSums2D):
 
     def __len__(self):
         return len(self.data)
+    
 
-
-class RotatedOmniglot(Dataset):
+class Omniglot(Dataset):
     def __init__(
         self,
-        exemplars_per_character,
-        characters=np.arange(10),
-        alphabets=np.arange(15),
-        seed=0,
+        test=False,
         ravel=True,
-        ordered=False,
-        noise=0.0,
-        n_repeats=10,
-        percent_transformations=1.0,
     ):
 
         super().__init__()
 
         self.name = "omniglot"
-        np.random.seed(seed)
+        self.ravel = ravel
+        self.test = test
 
-        omniglot = pd.read_pickle("~/data/omniglot/omniglot_small.p")
+        if test:
+            omniglot = pd.read_pickle('/home/sanborn/datasets/omniglot/omniglot_30x30_test.p')
+        else:
+            omniglot = pd.read_pickle('/home/sanborn/datasets/omniglot/omniglot_30x30_train.p')
+            
+        labels = np.array(list(omniglot.labels))
+        alphabet_labels = np.array(list(omniglot.alphabet_labels))
+        imgs = np.array(list(omniglot.imgs))
+
+        self.dim = 900
+        self.img_size = (30, 30)
+        if not ravel:
+            self.channels = 1
+            imgs = imgs.reshape((imgs.shape[0], 1, 30, 30))
+        else:
+            imgs = imgs.reshape((imgs.shape[0], -1))
+        self.data = torch.Tensor(imgs)
+        self.labels = torch.Tensor(labels)
+        self.alphabet_labels = torch.Tensor(alphabet_labels)
+
+    def __getitem__(self, idx):
+        x = self.data[idx]
+        y = self.labels[idx]
+        return x, y
+
+    def __len__(self):
+        return len(self.data)
+
+
+class RotatedOmniglot(Dataset):
+    def __init__(
+        self,
+        test=False,
+        ravel=True,
+        n_exemplars=1,
+        n_repeats=10,
+        n_transformations=360,
+    ):
+
+        super().__init__()
+
+        self.name = "rotated-omniglot"
+        self.ravel = ravel
+        self.test = test
+        self.n_exemplars = n_exemplars
+        self.n_repeats = n_repeats
+        self.n_transformations = n_transformations
+
+        if test:
+            omniglot = pd.read_pickle('/home/sanborn/datasets/omniglot/omniglot_30x30_test.p')
+        else:
+            omniglot = pd.read_pickle('/home/sanborn/datasets/omniglot/omniglot_30x30_train.p')
+            
         all_labels = np.array(list(omniglot.labels))
         all_alphabet_labels = np.array(list(omniglot.alphabet_labels))
         imgs = np.array(list(omniglot.imgs))
-        imgs = imgs.reshape((imgs.shape[0], 30, 30))
 
-        alphabet_idxs = {a: np.where(all_alphabet_labels == a)[0] for a in alphabets}
-
-        n_rotations = int(359 * percent_transformations)
-        all_rotations = np.arange(360)
+        character_idxs = {a: np.where(all_labels == a)[0] for a in all_labels}
 
         data = []
         labels = []
         alphabet_labels = []
-
-        for alphabet in alphabets:
-            cs = imgs[alphabet_idxs[alphabet]]
-            ls = all_labels[alphabet_idxs[alphabet]]
-            als = all_alphabet_labels[alphabet_idxs[alphabet]]
-            start = 0
-            for c in characters:
-                start = c * 20
-                end = start + exemplars_per_character
-                exemplars = cs[start:end]
-                ex_ls = ls[start:end]
-                ex_als = als[start:end]
-
-                for i, img in enumerate(exemplars):
-                    # Select rotations
-                    if not ordered:
-                        np.random.shuffle(all_rotations)
-                    select_rotations = all_rotations[:n_rotations]
-
-                    for angle in select_rotations:
-                        for r in range(n_repeats):
-                            t = transform.rotate(img, angle)
-                            t -= t.mean(keepdims=True)
-                            t /= t.std(keepdims=True)
-                            n = np.random.uniform(-noise, noise, size=img.shape)
-                            t = t + n
-                            if ravel:
-                                data.append(t.ravel())
-                            else:
-                                data.append(t)
-                            labels.append(ex_ls[i])
-                            alphabet_labels.append(ex_als[i])
-
-                start += 20
+        
+        rotations = np.linspace(0, 360, n_transformations)
+        
+        for l in all_labels:
+            exemplar_idxs = np.random.choice(character_idxs[l], n_exemplars)
+            character_imgs = imgs[exemplar_idxs]
+            for i in exemplar_idxs:
+                for angle in rotations:
+                    t = transform.rotate(imgs[i], angle)
+                    t -= t.mean(keepdims=True)
+                    t /= t.std(keepdims=True)
+                    if ravel:
+                        t = t.ravel()
+                    data += [t] * n_repeats
+                    labels += [all_labels[i]] * n_repeats
+                    alphabet_labels += [all_alphabet_labels[i]] * n_repeats
 
         data = np.array(data)
         self.dim = 900
+        self.img_size = (30, 30)
+        
         if not ravel:
             self.channels = 1
             data = data.reshape((data.shape[0], 1, 30, 30))
-        else:
-            data = data.reshape((data.shape[0], 900))
+
         self.data = torch.Tensor(data)
         self.labels = labels
         self.alphabet_labels = alphabet_labels
-        self.exemplars_per_character = exemplars_per_character
-        self.characters = characters
-        self.alphabets = alphabets
-        self.ordered = ordered
-        self.ravel = ravel
-        self.n_repeats = n_repeats
-        self.percent_transformations = percent_transformations
-        self.seed = seed
-        self.noise = noise
+
 
     def __getitem__(self, idx):
         x = self.data[idx]
