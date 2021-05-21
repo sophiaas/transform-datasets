@@ -973,7 +973,7 @@ class RotatedOmniglot(Dataset):
         
         rotations = np.linspace(0, 360, n_transformations)
         
-        for l in all_labels:
+        for l in tqdm(all_labels):
             exemplar_idxs = np.random.choice(character_idxs[l], n_exemplars)
             character_imgs = imgs[exemplar_idxs]
             for i in exemplar_idxs:
