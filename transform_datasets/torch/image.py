@@ -14,6 +14,57 @@ from itertools import product
 from scipy.special import jn, yn, jn_zeros, yn_zeros
 import random
 
+from transform_datasets.torch import utils
+
+
+class SmoothedRandom(Dataset):
+    def __init__(
+        self,
+        n_classes=100,
+        img_size=65,
+        group_type='rotation',
+        n_transformations=50,
+        blur_parameter=1,
+        percent_translations=0.1,
+        scale_range=(1,0.5),
+        seed=0,
+        ravel=True
+    ):
+        super().__init__()
+        np.random.seed(seed)
+        self.seed = seed
+        self.n_classes = n_classes
+        self.group_type = group_type
+        self.name = "smoothed_random_{}".format(self.group_type)
+        self.img_size = (img_size, img_size)
+        self.img_side = img_size
+        self.n_transformations = n_transformations
+        self.blur_parameter=blur_parameter
+        self.percent_translations=percent_translations
+        self.scale_range=scale_range
+        self.ravel = ravel
+        
+        dataset, labels = utils.gen_random_data(self.img_size, self.n_classes, self.group_type, self.n_transformations)
+
+        if self.ravel:
+            num_elements = dataset.shape[0]
+            dataset = dataset.reshape(num_elements,-1)
+            self.dim = self.img_side ** 2
+        else:
+            self.dim = self.img_side
+
+        self.data = dataset
+        self.labels = labels
+
+   
+    def __getitem__(self, idx):
+        x = self.data[idx]
+        y = self.labels[idx]
+        return x, y
+
+    def __len__(self):
+        return len(self.data)
+
     
 class DiskHarmonicPatterns(Dataset):
     '''
