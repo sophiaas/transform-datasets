@@ -481,9 +481,9 @@ class MNIST(Dataset):
         self.ordered = ordered
 
         if test:
-            mnist = np.array(pd.read_csv("/home/sanborn/datasets/mnist/mnist_test.csv"))
+            mnist = np.array(pd.read_csv( os.path.expanduser("~/datasets/mnist/mnist_test.csv")))
         else:
-            mnist = np.array(pd.read_csv("/home/sanborn/datasets/mnist/mnist_test.csv"))
+            mnist = np.array(pd.read_csv( os.path.expanduser("~/datasets/mnist/mnist_train.csv")))
 
         labels = mnist[:, 0]
         mnist = mnist[:, 1:]
@@ -518,24 +518,35 @@ class TranslatedMNIST(Dataset):
     def __init__(
         self,
         exemplars_per_digit,
-        digits=np.arange(10),
         percent_transformations=0.5,
         max_translation=7,
         ordered=False,
-        noise=0.1,
+        noise=0.0,
         seed=0,
+        test=False
     ):
 
         super().__init__()
 
         self.name = "translated-mnist"
-        np.random.seed(seed)
+        np.random.seed(seed)        
         self.dim = 28 ** 2
+        self.img_size = (28, 28)
+        self.test = test
+        self.ordered = ordered
+        self.exemplars_per_digit = exemplars_per_digit
+        self.percent_transformations = percent_transformations
+        self.noise = noise
+        self.max_translation = max_translation
+        self.seed = seed
 
-        mnist = np.array(pd.read_csv("~/data/mnist/mnist_test.csv"))
+        if test:
+            mnist = np.array(pd.read_csv( os.path.expanduser("~/datasets/mnist/mnist_test.csv")))
+        else:
+            mnist = np.array(pd.read_csv( os.path.expanduser("~/datasets/mnist/mnist_train.csv")))
 
         all_labels = mnist[:, 0]
-        label_idxs = {a: np.where(all_labels == a)[0] for a in digits}
+        label_idxs = {a: np.where(all_labels == a)[0] for a in np.unique(all_labels)}
 
         mnist = mnist[:, 1:]
         mnist = mnist / 255
@@ -557,8 +568,8 @@ class TranslatedMNIST(Dataset):
         exemplar_labels = []
         ex_idx = 0
 
-        for number in digits:
-            # Select digits
+        for number in label_idxs.keys():
+            # Select exemplars
             idxs = np.random.choice(
                 label_idxs[number], exemplars_per_digit, replace=False
             )
@@ -585,8 +596,10 @@ class TranslatedMNIST(Dataset):
 
         data = np.array(data)
         self.data = torch.Tensor(data)
-        self.labels = labels
-        self.exemplar_labels = exemplar_labels
+#         self.labels = labels
+#         self.exemplar_labels = exemplar_labels
+        self.labels = exemplar_labels
+        self.category_labels = labels
         self.exemplars_per_digit = exemplars_per_digit
 
     def translate(self, img, x=0, y=0):
@@ -641,9 +654,9 @@ class RotatedMNIST(Dataset):
         np.random.seed(seed)
 
         if test:
-            mnist = np.array(pd.read_csv("/home/sanborn/datasets/mnist/mnist_test.csv"))
+            mnist = np.array(pd.read_csv( os.path.expanduser("~/datasets/mnist/mnist_test.csv")))
         else:
-            mnist = np.array(pd.read_csv("/home/sanborn/datasets/mnist/mnist_train.csv"))
+            mnist = np.array(pd.read_csv( os.path.expanduser("~/datasets/mnist/mnist_train.csv")))
 
         all_labels = mnist[:, 0]
         label_idxs = {a: np.where(all_labels == a)[0] for a in digits}
@@ -900,6 +913,7 @@ class Omniglot(Dataset):
         self,
         test=False,
         ravel=True,
+        n_repeats=10
     ):
 
         super().__init__()
@@ -907,15 +921,16 @@ class Omniglot(Dataset):
         self.name = "omniglot"
         self.ravel = ravel
         self.test = test
+        self.n_repeats = n_repeats
 
         if test:
-            omniglot = pd.read_pickle('/home/sanborn/datasets/omniglot/omniglot_30x30_test.p')
+            omniglot = pd.read_pickle(os.path.expanduser('~/datasets/omniglot/omniglot_30x30_test.p'))
         else:
-            omniglot = pd.read_pickle('/home/sanborn/datasets/omniglot/omniglot_30x30_train.p')
+            omniglot = pd.read_pickle(os.path.expanduser('~/datasets/omniglot/omniglot_30x30_train.p'))
             
-        labels = np.array(list(omniglot.labels))
-        alphabet_labels = np.array(list(omniglot.alphabet_labels))
-        imgs = np.array(list(omniglot.imgs))
+        labels = np.array(list(omniglot.labels) * n_repeats)
+        alphabet_labels = np.array(list(omniglot.alphabet_labels) * n_repeats)
+        imgs = np.array(list(omniglot.imgs) * n_repeats)
 
         self.dim = 900
         self.img_size = (30, 30)
@@ -944,22 +959,27 @@ class RotatedOmniglot(Dataset):
         ravel=True,
         n_exemplars=1,
         n_repeats=10,
+        seed=0,
+        noise=0.0,
         n_transformations=360,
     ):
 
         super().__init__()
+        np.random.seed(seed)
 
         self.name = "rotated-omniglot"
         self.ravel = ravel
         self.test = test
         self.n_exemplars = n_exemplars
         self.n_repeats = n_repeats
+        self.seed = seed
+        self.noise = noise
         self.n_transformations = n_transformations
 
         if test:
-            omniglot = pd.read_pickle('/home/sanborn/datasets/omniglot/omniglot_30x30_test.p')
+            omniglot = pd.read_pickle(os.path.expanduser('~/datasets/omniglot/omniglot_30x30_test.p'))
         else:
-            omniglot = pd.read_pickle('/home/sanborn/datasets/omniglot/omniglot_30x30_train.p')
+            omniglot = pd.read_pickle( os.path.expanduser('~/datasets/omniglot/omniglot_30x30_train.p'))
             
         all_labels = np.array(list(omniglot.labels))
         all_alphabet_labels = np.array(list(omniglot.alphabet_labels))
@@ -969,11 +989,13 @@ class RotatedOmniglot(Dataset):
 
         data = []
         labels = []
+        exemplar_labels = []
         alphabet_labels = []
         
         rotations = np.linspace(0, 360, n_transformations)
         
-        for l in tqdm(all_labels):
+        ex = 0
+        for l in tqdm(np.unique(all_labels)):
             exemplar_idxs = np.random.choice(character_idxs[l], n_exemplars)
             character_imgs = imgs[exemplar_idxs]
             for i in exemplar_idxs:
@@ -981,11 +1003,14 @@ class RotatedOmniglot(Dataset):
                     t = transform.rotate(imgs[i], angle)
                     t -= t.mean(keepdims=True)
                     t /= t.std(keepdims=True)
+                    t += np.random.uniform(-noise, noise, size=t.shape)
                     if ravel:
                         t = t.ravel()
                     data += [t] * n_repeats
                     labels += [all_labels[i]] * n_repeats
                     alphabet_labels += [all_alphabet_labels[i]] * n_repeats
+                    exemplar_labels += [ex] * n_repeats
+                ex += 1
 
         data = np.array(data)
         self.dim = 900
@@ -996,8 +1021,9 @@ class RotatedOmniglot(Dataset):
             data = data.reshape((data.shape[0], 1, 30, 30))
 
         self.data = torch.Tensor(data)
-        self.labels = labels
-        self.alphabet_labels = alphabet_labels
+        self.exemplar_labels = torch.tensor(exemplar_labels)
+        self.labels = torch.Tensor(labels)
+        self.alphabet_labels = torch.Tensor(alphabet_labels)
 
 
     def __getitem__(self, idx):
