@@ -95,6 +95,7 @@ class DiskHarmonicPatterns(Dataset):
         self.n_classes = n_classes
         self.n_rotations = n_rotations
         self.seed = seed
+        self.orbit_size = n_rotations
         self.gen_dataset()
     
     def disk_harmonic(self,n, m, r, theta, mmax = 12):
@@ -200,7 +201,7 @@ class HarmonicPatternsS1xS1(Dataset):
         
         super().__init__()
         np.random.seed(seed)
-        self.name = 'oscillations-s1xs1'
+        self.name = 'harmonic-patterns-s1xs1'
         self.img_size = img_size
         if ravel:
             self.dim = img_size[0] * img_size[1]
@@ -281,6 +282,7 @@ class HarmonicPatternsS1xS1Orbit(HarmonicPatternsS1xS1):
         self.ordered = ordered
         self.n_transformations = int(img_size[0] * img_size[1] * percent_transformations)
         self.equivariant = equivariant
+        self.orbit_size = self.n_transformations
         
         super().__init__(img_size=img_size,
                          n_classes=n_classes,
@@ -290,7 +292,7 @@ class HarmonicPatternsS1xS1Orbit(HarmonicPatternsS1xS1):
                          ravel=ravel,
                          real=real)
         
-        self.name = 'oscillations-s1xs1-orbit'
+        self.name = 'harmonic-patterns-s1xs1-orbit'
         
     def gen_dataset(self):
         data = []
@@ -335,7 +337,7 @@ class Cyclic2DTranslation(Dataset):
     def __init__(
         self,
         n_classes=100,
-        dim=(32, 32),
+        img_size=(32, 32),
         noise=0.2,
         seed=0,
         percent_transformations=1.0,
@@ -344,19 +346,20 @@ class Cyclic2DTranslation(Dataset):
     ):
         np.random.seed(seed)
         self.name = "cyclic-2d-translation"
-        random_classes = np.random.uniform(-1, 1, size=(n_classes,) + dim)
+        random_classes = np.random.uniform(-1, 1, size=(n_classes,) + img_size)
         random_classes -= np.mean(random_classes, axis=(1, 2), keepdims=True)
         random_classes /= np.std(random_classes, axis=(1, 2), keepdims=True)
         dataset, labels, transformations = [], [], []
 
         all_transformations = list(
             itertools.product(
-                np.arange(dim[0]),
-                np.arange(dim[1]),
+                np.arange(img_size[0]),
+                np.arange(img_size[1]),
             )
         )
 
         n_transformations = int(len(all_transformations) * percent_transformations)
+        self.orbit_size = n_transformations
 
         for i, c in enumerate(random_classes):
             if not ordered:
@@ -364,7 +367,7 @@ class Cyclic2DTranslation(Dataset):
             select_transformations = all_transformations[:n_transformations]
             for h, v in select_transformations:
                 datapoint = self.translate(c, h, v)
-                n = np.random.uniform(-noise, noise, size=dim)
+                n = np.random.uniform(-noise, noise, size=img_size)
                 datapoint += n
 
                 if vectorized:
@@ -378,6 +381,7 @@ class Cyclic2DTranslation(Dataset):
         self.labels = torch.Tensor(labels)
         self.transformation = torch.Tensor(transformations)
         self.dim = datapoint.shape[-1]
+        self.img_size = img_size
         self.n_classes = n_classes
         self.noise = noise
         self.seed = seed
@@ -523,7 +527,8 @@ class TranslatedMNIST(Dataset):
         ordered=False,
         noise=0.0,
         seed=0,
-        test=False
+        test=False,
+        exemplar=True
     ):
 
         super().__init__()
@@ -539,6 +544,7 @@ class TranslatedMNIST(Dataset):
         self.noise = noise
         self.max_translation = max_translation
         self.seed = seed
+        self.exemplar = exemplar
 
         if test:
             mnist = np.array(pd.read_csv( os.path.expanduser("~/datasets/mnist/mnist_test.csv")))
@@ -562,6 +568,7 @@ class TranslatedMNIST(Dataset):
         )
 
         n_translations = int(len(all_translations) * percent_transformations)
+        self.orbit_size = n_translations
 
         data = []
         labels = []
@@ -596,10 +603,13 @@ class TranslatedMNIST(Dataset):
 
         data = np.array(data)
         self.data = torch.Tensor(data)
-#         self.labels = labels
-#         self.exemplar_labels = exemplar_labels
-        self.labels = exemplar_labels
-        self.category_labels = labels
+        self.exemplar_labels = torch.Tensor(exemplar_labels)
+        self.category_labels = torch.Tensor(labels)
+        if self.exemplar:
+            self.labels = self.exemplar_labels
+        else:
+            self.labels = self.category_labels
+
         self.exemplars_per_digit = exemplars_per_digit
 
     def translate(self, img, x=0, y=0):
@@ -635,6 +645,7 @@ class RotatedMNIST(Dataset):
         n_repeats=50,
         ordered=False,
         ravel=True,
+        exemplar=True
     ):
 
         super().__init__()
@@ -650,6 +661,7 @@ class RotatedMNIST(Dataset):
         self.ordered = ordered
         self.ravel = ravel
         self.test = test
+        self.exemplar = exemplar
 
         np.random.seed(seed)
 
@@ -670,6 +682,8 @@ class RotatedMNIST(Dataset):
 
         n_rotations = int(359 * percent_transformations)
         all_rotations = np.arange(360)
+        
+        self.orbit_size = n_rotations
 
         data = []
         labels = []
@@ -712,8 +726,12 @@ class RotatedMNIST(Dataset):
             self.channels = 1
             data = data.reshape((data.shape[0], 1, 28, 28))
         self.data = torch.Tensor(data)
-        self.labels = labels
-        self.exemplar_labels = exemplar_labels
+        self.exemplar_labels = torch.Tensor(exemplar_labels)
+        self.category_labels = torch.Tensor(labels)
+        if self.exemplar:
+            self.labels = self.exemplar_labels
+        else:
+            self.labels = self.category_labels
         self.exemplars_per_digit = exemplars_per_digit
         self.n_repeats = n_repeats
 
@@ -747,6 +765,7 @@ class SinusoidSums2D(Dataset):
         self.vectorized = vectorized
         self.n_classes = n_classes
         self.seed = seed
+        self.name = "sinusoid-sums-2d"
 
         np.random.seed(seed)
 
@@ -838,6 +857,8 @@ class RotatedSinusoidSums2D(SinusoidSums2D):
 
         n_rotations = int(359 * percent_transformations)
         all_rotations = np.arange(360)
+        
+        self.orbit_size = n_rotations
 
         if circle_crop:
             if img_size[0] % 2 == 0 or img_size[1] % 2 == 0:
@@ -934,11 +955,15 @@ class Omniglot(Dataset):
 
         self.dim = 900
         self.img_size = (30, 30)
+        imgs -= imgs.mean(axis=(1, 2), keepdims=True)
+        imgs /= imgs.std(axis=(1, 2), keepdims=True)
+
         if not ravel:
             self.channels = 1
             imgs = imgs.reshape((imgs.shape[0], 1, 30, 30))
         else:
             imgs = imgs.reshape((imgs.shape[0], -1))
+            
         self.data = torch.Tensor(imgs)
         self.labels = torch.Tensor(labels)
         self.alphabet_labels = torch.Tensor(alphabet_labels)
@@ -962,6 +987,7 @@ class RotatedOmniglot(Dataset):
         seed=0,
         noise=0.0,
         n_transformations=360,
+        exemplar=True
     ):
 
         super().__init__()
@@ -975,6 +1001,8 @@ class RotatedOmniglot(Dataset):
         self.seed = seed
         self.noise = noise
         self.n_transformations = n_transformations
+        self.exemplar = exemplar
+        self.orbit_size = n_transformations
 
         if test:
             omniglot = pd.read_pickle(os.path.expanduser('~/datasets/omniglot/omniglot_30x30_test.p'))
@@ -999,8 +1027,9 @@ class RotatedOmniglot(Dataset):
             exemplar_idxs = np.random.choice(character_idxs[l], n_exemplars)
             character_imgs = imgs[exemplar_idxs]
             for i in exemplar_idxs:
+                img = imgs[i] - imgs[i].min()
                 for angle in rotations:
-                    t = transform.rotate(imgs[i], angle)
+                    t = transform.rotate(img, angle)
                     t -= t.mean(keepdims=True)
                     t /= t.std(keepdims=True)
                     t += np.random.uniform(-noise, noise, size=t.shape)
@@ -1021,8 +1050,12 @@ class RotatedOmniglot(Dataset):
             data = data.reshape((data.shape[0], 1, 30, 30))
 
         self.data = torch.Tensor(data)
-        self.exemplar_labels = torch.tensor(exemplar_labels)
-        self.labels = torch.Tensor(labels)
+        self.exemplar_labels = torch.Tensor(exemplar_labels)
+        self.category_labels = torch.Tensor(labels)
+        if self.exemplar:
+            self.labels = self.exemplar_labels
+        else:
+            self.labels = self.category_labels
         self.alphabet_labels = torch.Tensor(alphabet_labels)
 
 
