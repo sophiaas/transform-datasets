@@ -502,7 +502,7 @@ class MNIST(Dataset):
             labels = labels[sort_idx]
             
         self.data = torch.Tensor(mnist)
-        self.labels = torch.Tensor(labels)
+        self.labels = torch.Tensor(labels).long()
 
 
     def __getitem__(self, idx):
