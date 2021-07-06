@@ -233,6 +233,87 @@ class CyclicTranslation(Dataset):
 
     def __len__(self):
         return len(self.data)
+    
+class Cyclic1DTranslation(Dataset):
+    def __init__(
+        self,
+        n_classes=100,
+        dim=32,
+        noise=0.2,
+        noise_before_transformation=True,
+        n_samples=100,
+        seed=0,
+        percent_transformations=1.0,
+        ordered=False,
+        equivariant=False,
+    ):
+
+        np.random.seed(seed)
+        self.name = "cyclic-1d-translation"
+        random_classes = np.random.uniform(-1, 1, size=(n_classes, dim))
+        random_classes -= np.mean(random_classes, axis=1, keepdims=True)
+        dataset, labels, s = [], [], []
+        if equivariant:
+            x0 = []
+
+        all_transformations = np.arange(dim)
+        n_transformations = int(percent_transformations * len(all_transformations))
+        
+        if noise_before_transformation:      
+            for i, c in enumerate(random_classes):
+                if not ordered:
+                    np.random.shuffle(all_transformations)
+                select_transformations = all_transformations[:n_transformations]
+                for s in range(n_samples):
+                    n = np.random.uniform(-noise, noise, size=dim)
+                    c_ = c + n
+                    for t in select_transformations:
+                        datapoint = self.translate(c_, t)
+                        dataset.append(datapoint)
+                        labels.append(i)
+                        s.append(t)
+                        
+        else:
+            for i, c in enumerate(random_classes):
+                if not ordered:
+                    np.random.shuffle(all_transformations)
+                select_transformations = all_transformations[:n_transformations]
+                for t in select_transformations:
+                    datapoint = self.translate(c, t)
+                    for s in range(n_samples):
+                        n = np.random.uniform(-noise, noise, size=dim)
+                        datapoint_ = datapoint + n
+                        dataset.append(datapoint_)
+                        labels.append(i)
+                        transformations.append(t)
+
+        self.data = torch.Tensor(dataset)
+        self.labels = torch.Tensor(labels)
+        self.s = torch.Tensor(s)
+        self.dim = dim
+        self.n_classes = n_classes
+        self.noise = noise
+        self.noise_before_transformation = noise_before_transformation
+        self.seed = seed
+        self.percent_transformations = percent_transformations
+        self.ordered = ordered
+        self.equivariant = equivariant
+
+    def translate(self, x, t):
+        new_x = list(x)
+        for i in range(t):
+            last = new_x.pop()
+            new_x = [last] + new_x
+        return np.array(new_x)
+
+    def __getitem__(self, idx):
+        x = self.data[idx]
+        y = self.labels[idx]
+        return x, y
+
+    def __len__(self):
+        return len(self.data)
+
 
 
 class HierarchicalReflection(Dataset):
