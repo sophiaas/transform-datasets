@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 from torch.utils.data import Dataset
+# from torch_tools.data import Dataset
 
 from harmonics.groups.hierarchical_reflection import Reflection
 
@@ -13,7 +14,11 @@ class HarmonicPatternsS1(Dataset):
                  n_harmonics=5,
                  max_frequency=16,
                  seed=0,
+                 noise=0.0,
+                 n_samples=1,
                  real=True):
+        
+        #TODO: Implement noise
         
         super().__init__()
         np.random.seed(seed)
@@ -23,6 +28,8 @@ class HarmonicPatternsS1(Dataset):
         self.max_frequency = max_frequency
         self.seed = seed
         self.real = real
+        self.noise = noise
+        self.n_samples = n_samples
 
         self.name = "harmonic-patterns-s1"
         self.coordinates = np.arange(0, np.pi * 2, np.pi * 2 / dim)
@@ -33,8 +40,11 @@ class HarmonicPatternsS1(Dataset):
         labels = []
         for c in range(self.n_classes):
             d = self.random_signal()
-            data.append(d)
-            labels.append(c)
+            for s in range(n_samples):
+                n = np.random.uniform(-self.noise, self.noise, size=self.dim)
+                d_ = d + n
+                data.append(d_)
+                labels.append(c)
         self.data = torch.tensor(np.array(data))
         self.labels = torch.tensor(labels)
         
@@ -79,18 +89,31 @@ class HarmonicPatternsS1Orbit(HarmonicPatternsS1):
                  ordered=False,
                  max_frequency=16,
                  seed=0,
+                 noise=0.0,
+                 n_samples=1,
+                 noise_before_transformation=False,
                  real=True,
                  equivariant=False):
-        
+                
         self.percent_transformations = percent_transformations
         self.n_transformations = int(dim * percent_transformations)
         self.ordered = ordered
         self.equivariant = equivariant
+        self.noise = noise
+        self.noise_before_transformation = noise_before_transformation
+        self.n_samples = n_samples
+        
+        if noise_before_transformation:
+            class_noise = noise
+        else:
+            class_noise = 0.0
         
         super().__init__(dim=dim,
                          n_classes=n_classes,
                          n_harmonics=n_harmonics,
                          max_frequency=max_frequency,
+                         noise=class_noise,
+                         n_samples=n_samples,
                          seed=seed,
                          real=real)
         
@@ -115,7 +138,13 @@ class HarmonicPatternsS1Orbit(HarmonicPatternsS1):
         select_transformations = all_transformations[:self.n_transformations]
         for g in select_transformations:
             signal_t = self.translate(signal, g)
-            orbit.append(signal_t) 
+            if not self.noise_before_transformation:
+                for s in range(self.n_samples):
+                    n = np.random.uniform(-self.noise, self.noise, size=self.dim)
+                    signal_t_ = signal_t + n
+                    orbit.append(signal_t_) 
+                else:
+                    orbit.append(signal_t) 
         return orbit
     
     def __getitem__(self, idx):
@@ -351,54 +380,3 @@ class HierarchicalReflection(Dataset):
 
     def __len__(self):
         return len(self.data)
-
-
-def gen_1D_fourier_variant(
-    n_samples,
-    dim,
-    complex_input=False,
-    project_input=False,
-    project_output=False,
-    variant="fourier",
-    standardize=False,
-    seed=0,
-):
-
-    # TODO: Either convert this into proper datasets or delete
-
-    np.random.seed(seed)
-
-    X = np.random.uniform(-1, 1, size=(n_samples, dim))
-
-    if complex_input:
-        X += 1j * np.random.uniform(-1, 1, size=(n_samples, dim))
-
-    F = np.fft.fft(X, axis=-1)
-
-    if complex_input and project_input:
-        X = np.hstack([X.real, X.imag])
-
-    if variant == "fourier":
-        if project_output:
-            F = np.hstack([F.real, F.imag])
-        return X, F
-
-    elif variant == "power-spectrum":
-        PS = np.abs(F) ** 2
-        return X, PS
-
-    elif variant == "bispectrum":
-        B = []
-        for f in F:
-            b = np.zeros(dim + 1, dtype=np.complex)
-            b[0] = np.conj(f[0] * f[0]) * f[0]
-            b[1:-1] = np.conj(f[:-1] * f[1]) * f[1:]
-            b[dim] = np.conj(f[dim - 1] * f[1]) * f[0]
-            B.append(b)
-        B = np.array(B)
-        if project_output:
-            B = np.hstack([B.real, B.imag])
-        return X, B
-
-    else:
-        raise ValueError("Invalid dataset type")
