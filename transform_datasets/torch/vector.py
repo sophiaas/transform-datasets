@@ -293,7 +293,7 @@ class Cyclic1DTranslation(Dataset):
                 if not ordered:
                     np.random.shuffle(all_transformations)
                 select_transformations = all_transformations[:n_transformations]
-                for s in range(n_samples):
+                for k in range(n_samples):
                     n = np.random.uniform(-noise, noise, size=dim)
                     c_ = c + n
                     for t in select_transformations:
@@ -309,12 +309,12 @@ class Cyclic1DTranslation(Dataset):
                 select_transformations = all_transformations[:n_transformations]
                 for t in select_transformations:
                     datapoint = self.translate(c, t)
-                    for s in range(n_samples):
+                    for k in range(n_samples):
                         n = np.random.uniform(-noise, noise, size=dim)
                         datapoint_ = datapoint + n
                         dataset.append(datapoint_)
                         labels.append(i)
-                        transformations.append(t)
+                        s.append(t)
 
         self.data = torch.Tensor(dataset)
         self.labels = torch.Tensor(labels)
