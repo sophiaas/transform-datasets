@@ -14,7 +14,6 @@ class HarmonicPatternsS1(Dataset):
                  n_harmonics=5,
                  max_frequency=16,
                  seed=0,
-                 noise=0.0,
                  n_samples=1,
                  real=True):
         
@@ -28,7 +27,6 @@ class HarmonicPatternsS1(Dataset):
         self.max_frequency = max_frequency
         self.seed = seed
         self.real = real
-        self.noise = noise
         self.n_samples = n_samples
 
         self.name = "harmonic-patterns-s1"
@@ -101,37 +99,48 @@ class HarmonicPatternsS1Orbit(HarmonicPatternsS1):
         self.equivariant = equivariant
         self.noise = noise
         self.noise_before_transformation = noise_before_transformation
-        self.n_samples = n_samples
-        
-        if noise_before_transformation:
-            class_noise = noise
-        else:
-            class_noise = 0.0
+        self.n_samples = n_samples  
         
         super().__init__(dim=dim,
                          n_classes=n_classes,
                          n_harmonics=n_harmonics,
                          max_frequency=max_frequency,
-                         noise=class_noise,
                          n_samples=n_samples,
                          seed=seed,
                          real=real)
-        
+              
         self.name = 'harmonic-patterns-s1-orbit'
         
     def gen_dataset(self):
-        data = []
-        labels = []
+        data, labels, s, x0 = [], [], [], []
         for c in range(self.n_classes):
             signal = self.random_signal()
-            orbit = self.gen_orbit(signal)
-            data += orbit  
-            labels += [c] * len(orbit)
-        self.data = torch.tensor(np.array(data))
-        self.labels = torch.tensor(labels)
+            if self.noise_before_transformation:
+                for k in range(n_samples):
+                    n = np.random.uniform(-self.noise, self.noise, size=self.dim)
+                    signal_ = signal + n
+                    orbit, transforms = self.gen_orbit(signal_)
+                    data += orbit  
+                    labels += [c] * len(orbit)
+                    s += transforms
+                    if self.equivariant:
+                        x0.append(signal)
+            else:
+                orbit, transforms = self.gen_orbit(signal)
+                data += orbit  
+                labels += [c] * len(orbit)
+                s += transforms
+                if self.equivariant:
+                    x0.append(signal)
+        self.data = torch.Tensor(np.array(data))
+        self.labels = torch.Tensor(labels)
+        self.s = torch.Tensor(s)
+        if self.equivariant:
+            self.x0 = torch.Tensor(x0)
         
     def gen_orbit(self, signal):
         orbit = []
+        s = []
         all_transformations = np.arange(self.dim)
         if not self.ordered:
              np.random.shuffle(all_transformations)
@@ -139,18 +148,25 @@ class HarmonicPatternsS1Orbit(HarmonicPatternsS1):
         for g in select_transformations:
             signal_t = self.translate(signal, g)
             if not self.noise_before_transformation:
-                for s in range(self.n_samples):
+                for k in range(self.n_samples):
                     n = np.random.uniform(-self.noise, self.noise, size=self.dim)
                     signal_t_ = signal_t + n
                     orbit.append(signal_t_) 
+                    s.append(g)
                 else:
                     orbit.append(signal_t) 
-        return orbit
+                    s.append(g)
+        return orbit, s
     
     def __getitem__(self, idx):
         x = self.data[idx]
         y = self.labels[idx]
-        return x, y
+        if self.equivariant:
+            s = self.s[idx]
+            x0 = self.x0[idx]
+            return x, y, s, x0
+        else:
+            return x, y
 
     def __len__(self):
         return len(self.data)
@@ -276,6 +292,7 @@ class Cyclic1DTranslation(Dataset):
         ordered=False,
         equivariant=False,
     ):
+        #TODO: equivariant dataset
 
         np.random.seed(seed)
         self.name = "cyclic-1d-translation"

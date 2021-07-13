@@ -309,7 +309,6 @@ class HarmonicPatternsS1xS1Orbit(HarmonicPatternsS1xS1):
         
     def gen_orbit(self, signal):
         orbit = []
-        
         all_transformations = list(
             itertools.product(
                 np.arange(self.img_size[0]),
@@ -913,7 +912,7 @@ class RotatedSinusoidSums2D(SinusoidSums2D):
         self.labels = torch.Tensor(labels)
         self.s = torch.Tensor(s)
         if equivariant:
-            self.x0 = x0
+            self.x0 = torch.Tensor(x0)
 
     def __getitem__(self, idx):
         x = self.data[idx]
