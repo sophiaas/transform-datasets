@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 from scipy import ndimage
-from transform_datasets.utils import translate1d, translate2d
+from transform_datasets.utils import translate1d, translate2d, rescale
 from skimage.transform import rotate
 import pyshtools as pysh
 import itertools
@@ -104,15 +104,17 @@ class GaussianBlur:
         self.sigma = sigma
         self.name = 'gaussian-blur'
 
-    def __call__(self, data):
-        transformed_data, transforms = [], []
-        for x in data:
+    def __call__(self, data, labels):
+        transformed_data, transforms, new_labels = [], [], []
+        for i, x in enumerate(data):
             xt = ndimage.gaussian_filter(x, sigma=self.sigma)
             transformed_data.append(xt)
             transforms.append(self.sigma)
+            new_labels.append(labels[i])
         transformed_data = torch.tensor(transformed_data)
         transforms = torch.tensor(transforms)
-        return transformed_data, transforms
+        new_labels = torch.tensor(new_labels)
+        return transformed_data, new_labels, transforms
 
 
 class SO2:
@@ -179,21 +181,23 @@ class C4:
     def __init__(self):
         self.name = 'c4'
         
-    def __call__(self, data):
+    def __call__(self, data, labels):
         assert (
             len(data.shape) == 3
         ), "Data must have shape (n_datapoints, img_size[0], img_size[1])"
 
-        transformed_data, transforms = [], []
+        transformed_data, transforms, new_labels = [], [], []
         all_transforms = np.arange(4)
-        for x in data:
+        for i, x in enumerate(data):
             for t in all_transforms:
                 xt = np.rot90(x, t)
                 transformed_data.append(xt)
                 transforms.append(t)
+                new_labels.append(labels[i])
         transformed_data = torch.tensor(transformed_data)
         transforms = torch.tensor(transforms)
-        return transformed_data, transforms
+        new_labels = torch.tensor(new_labels)
+        return transformed_data, new_labels, transforms
 
 
 class Scaling:
@@ -203,21 +207,23 @@ class Scaling:
         self.range_max = range_max
         self.name = 'scaling'
 
-    def __call__(self, data):
+    def __call__(self, data, labels):
         assert (
             len(data.shape) == 3
         ), "Data must have shape (n_datapoints, img_size[0], img_size[1])"
 
-        transformed_data, transforms = [], []
+        transformed_data, transforms, new_labels = [], [], []
         select_transforms = np.linspace(self.range_min, self.range_max, self.n_transforms)
-        for x in data:
+        for i, x in enumerate(data):
             for t in select_transforms:
                 xt = rescale(x, t, data.shape[-1])
-                transformed_data.append(x)
+                transformed_data.append(xt)
                 transforms.append(t)
+                new_labels.append(labels[i])
         transformed_data = torch.tensor(transformed_data)
         transforms = torch.tensor(transforms)
-        return transformed_data, transforms
+        new_labels = torch.tensor(new_labels)
+        return transformed_data, new_labels, transforms
 
 
 class CircleCrop:
