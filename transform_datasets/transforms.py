@@ -329,11 +329,7 @@ class CircleCrop:
         ), "Data must have shape (n_datapoints, img_size[0], img_size[1])"
 
         img_size = data.shape[1:]
-
-        assert (img_size[0] % 2 != 0) and (
-            img_size[1] % 2 != 0
-        ), "Image size should be a tuple of odd numbers to ensure centered rotational symmetry."
-
+            
         v, h = np.mgrid[: img_size[0], : img_size[1]]
         equation = (v - ((img_size[0] - 1) / 2)) ** 2 + (
             h - ((img_size[1] - 1) / 2)
