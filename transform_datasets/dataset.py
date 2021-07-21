@@ -23,19 +23,17 @@ class TransformDataset(Dataset):
         self.gen_transformations(dataset)
 
     def gen_transformations(self, dataset):
-        transform_dict = OrderedDict({x.name: [] for x in self.transforms})
+        transform_dict = OrderedDict()
         transformed_data = dataset.data.clone()
         new_labels = dataset.labels.clone()
         for transform in self.transforms:
-            transformed_data, new_labels, t = transform(transformed_data, new_labels)
-            transform_dict[transform.name] += t
+            transformed_data, new_labels, transform_dict, t = transform(
+                transformed_data, new_labels, transform_dict
+            )
+            transform_dict[transform.name] = t
         self.data = transformed_data
         self.labels = new_labels
-        for k in transform_dict:
-            transform_dict[k] = torch.stack(transform_dict[k])
         self.transform_labels = transform_dict
-
-            
 
     def __getitem__(self, idx):
         x = self.data[idx]

@@ -5,9 +5,28 @@ from transform_datasets.utils import translate1d, translate2d, rescale
 from skimage.transform import rotate
 import pyshtools as pysh
 import itertools
+from collections import OrderedDict
 
 
-class UniformNoise:
+class Transform:
+    def __init__(self):
+        self.name = None
+
+    def define_containers(self, tlabels):
+        transformed_data, transforms, new_labels = [], [], []
+        new_tlabels = OrderedDict({k: [] for k in tlabels.keys()})
+        return transformed_data, new_labels, new_tlabels, transforms
+
+    def reformat(self, transformed_data, new_labels, new_tlabels, transforms):
+        transformed_data = torch.tensor(transformed_data)
+        transforms = torch.tensor(transforms)
+        new_labels = torch.tensor(new_labels)
+        for k in new_tlabels.keys():
+            new_tlabels[k] = torch.stack(new_tlabels[k])
+        return transformed_data, new_labels, new_tlabels, transforms
+
+
+class UniformNoise(Transform):
     def __init__(self, seed=0, magnitude=1.0, n_samples=10):
         super().__init__()
         np.random.seed(seed)
@@ -15,26 +34,30 @@ class UniformNoise:
         self.magnitude = magnitude
         self.n_samples = n_samples
 
-    def __call__(self, data, labels):
+    def __call__(self, data, labels, tlabels):
         size = data.shape[1:]
-        transformed_data, transforms, new_labels = [], [], []
+        transformed_data, new_labels, new_tlabels, transforms = self.define_containers(
+            tlabels
+        )
         for i, x in enumerate(data):
             for j in range(self.n_samples):
-                noise = torch.tensor(
-                    np.random.uniform(-self.magnitude, self.magnitude, size=size)
-                )
+                noise = np.random.uniform(-self.magnitude, self.magnitude, size=size)
                 xt = x + noise
-                transformed_data.append(xt)
+                transformed_data.append(xt.numpy())
                 transforms.append(self.magnitude)
                 new_labels.append(labels[i])
-        transformed_data = torch.stack(transformed_data)
-        transforms = torch.tensor(transforms)
-        new_labels = torch.tensor(new_labels)
-        return transformed_data, new_labels, transforms
+                for k in new_tlabels.keys():
+                    new_tlabels[k].append(tlabels[k][i])
+
+        transformed_data, new_labels, new_tlabels, transforms = self.reformat(
+            transformed_data, new_labels, new_tlabels, transforms
+        )
+        return transformed_data, new_labels, new_tlabels, transforms
 
 
-class CyclicTranslation1D:
+class CyclicTranslation1D(Transform):
     def __init__(self, fraction_transforms=0.1, sample_method="linspace", seed=0):
+        super().__init__()
         assert sample_method in [
             "linspace",
             "random",
@@ -55,10 +78,13 @@ class CyclicTranslation1D:
             select_transforms = sorted(select_transforms)
             return select_transforms
 
-    def __call__(self, data, labels):
+    def __call__(self, data, labels, tlabels):
         assert len(data.shape) == 2, "Data must have shape (n_datapoints, dim)"
 
-        transformed_data, transforms, new_labels = [], [], []
+        transformed_data, new_labels, new_tlabels, transforms = self.define_containers(
+            tlabels
+        )
+
         dim = data.shape[-1]
         select_transforms = self.get_samples(dim)
         for i, x in enumerate(data):
@@ -69,14 +95,18 @@ class CyclicTranslation1D:
                 transformed_data.append(xt)
                 transforms.append(t)
                 new_labels.append(labels[i])
-        transformed_data = torch.tensor(transformed_data)
-        transforms = torch.tensor(transforms)
-        new_labels = torch.tensor(new_labels)
-        return transformed_data, new_labels, transforms
+                for k in new_tlabels.keys():
+                    new_tlabels[k].append(tlabels[k][i])
+
+        transformed_data, new_labels, new_tlabels, transforms = self.reformat(
+            transformed_data, new_labels, new_tlabels, transforms
+        )
+        return transformed_data, new_labels, new_tlabels, transforms
 
 
-class CyclicTranslation2D:
+class CyclicTranslation2D(Transform):
     def __init__(self, fraction_transforms=0.1, sample_method="linspace", seed=0):
+        super().__init__()
         assert sample_method in [
             "linspace",
             "random",
@@ -111,12 +141,15 @@ class CyclicTranslation2D:
             ]
             return select_transforms
 
-    def __call__(self, data, labels):
+    def __call__(self, data, labels, tlabels):
         assert (
             len(data.shape) == 3
         ), "Data must have shape (n_datapoints, img_size[0], img_size[1])"
 
-        transformed_data, transforms, new_labels = [], [], []
+        transformed_data, new_labels, new_tlabels, transforms = self.define_containers(
+            tlabels
+        )
+
         dim_v, dim_h = data.shape[-2:]
         select_transforms = self.get_samples(dim_v, dim_h)
         for i, x in enumerate(data):
@@ -127,32 +160,43 @@ class CyclicTranslation2D:
                 transformed_data.append(xt)
                 transforms.append((tv, th))
                 new_labels.append(labels[i])
-        transformed_data = torch.tensor(transformed_data)
-        transforms = torch.tensor(transforms)
-        new_labels = torch.tensor(new_labels)
-        return transformed_data, new_labels, transforms
+                for k in new_tlabels.keys():
+                    new_tlabels[k].append(tlabels[k][i])
+
+        transformed_data, new_labels, new_tlabels, transforms = self.reformat(
+            transformed_data, new_labels, new_tlabels, transforms
+        )
+        return transformed_data, new_labels, new_tlabels, transforms
 
 
-class GaussianBlur:
-    def __init__(self, sigma):
+class GaussianBlur(Transform):
+    def __init__(self, sigma=0.5):
+        super().__init__()
         self.sigma = sigma
         self.name = "gaussian-blur"
 
-    def __call__(self, data, labels):
-        transformed_data, transforms, new_labels = [], [], []
+    def __call__(self, data, labels, tlabels):
+        transformed_data, new_labels, new_tlabels, transforms = self.define_containers(
+            tlabels
+        )
+
         for i, x in enumerate(data):
             xt = ndimage.gaussian_filter(x, sigma=self.sigma)
             transformed_data.append(xt)
             transforms.append(self.sigma)
             new_labels.append(labels[i])
-        transformed_data = torch.tensor(transformed_data)
-        transforms = torch.tensor(transforms)
-        new_labels = torch.tensor(new_labels)
-        return transformed_data, new_labels, transforms
+            for k in new_tlabels.keys():
+                new_tlabels[k].append(tlabels[k][i])
+
+        transformed_data, new_labels, new_tlabels, transforms = self.reformat(
+            transformed_data, new_labels, new_tlabels, transforms
+        )
+        return transformed_data, new_labels, new_tlabels, transforms
 
 
-class SO2:
+class SO2(Transform):
     def __init__(self, fraction_transforms=0.1, sample_method="linspace", seed=0):
+        super().__init__()
         assert sample_method in [
             "linspace",
             "random",
@@ -173,12 +217,15 @@ class SO2:
             select_transforms = sorted(select_transforms)
             return select_transforms
 
-    def __call__(self, data, labels):
+    def __call__(self, data, labels, tlabels):
         assert (
             len(data.shape) == 3
         ), "Data must have shape (n_datapoints, img_size[0], img_size[1])"
 
-        transformed_data, transforms, new_labels = [], [], []
+        transformed_data, new_labels, new_tlabels, transforms = self.define_containers(
+            tlabels
+        )
+
         select_transforms = self.get_samples()
         for i, x in enumerate(data):
             if self.sample_method == "random":
@@ -188,16 +235,20 @@ class SO2:
                 transformed_data.append(xt)
                 transforms.append(t)
                 new_labels.append(labels[i])
-        transformed_data = torch.tensor(transformed_data)
-        transforms = torch.tensor(transforms)
-        new_labels = torch.tensor(new_labels)
-        return transformed_data, new_labels, transforms
+                for k in new_tlabels.keys():
+                    new_tlabels[k].append(tlabels[k][i])
+
+        transformed_data, new_labels, new_tlabels, transforms = self.reformat(
+            transformed_data, new_labels, new_tlabels, transforms
+        )
+        return transformed_data, new_labels, new_tlabels, transforms
 
 
-class SO3:
+class SO3(Transform):
     def __init__(
         self, n_samples=125, grid_type="GLQ", sample_method="linspace", seed=0
     ):
+        super().__init__()
         assert sample_method in [
             "linspace",
             "random",
@@ -224,11 +275,14 @@ class SO3:
             select_transforms = list(zip(alpha, beta, gamma))
             return select_transforms
 
-    def __call__(self, data, labels):
+    def __call__(self, data, labels, tlabels):
         assert (
             len(data.shape) == 3
         ), "Data must have shape (n_datapoints, img_size[0], img_size[1])"
-        transformed_data, transforms, new_labels = [], [], []
+        transformed_data, new_labels, new_tlabels, transforms = self.define_containers(
+            tlabels
+        )
+
         select_transforms = self.get_samples()
         for i, x in enumerate(data):
             if self.sample_method == "random":
@@ -241,22 +295,28 @@ class SO3:
                 transformed_data.append(xt.data)
                 transforms.append(t)
                 new_labels.append(labels[i])
-        transformed_data = torch.tensor(transformed_data)
-        transforms = torch.tensor(transforms)
-        new_labels = torch.tensor(new_labels)
-        return transformed_data, new_labels, transforms
+                for k in new_tlabels.keys():
+                    new_tlabels[k].append(tlabels[k][i])
+
+        transformed_data, new_labels, new_tlabels, transforms = self.reformat(
+            transformed_data, new_labels, new_tlabels, transforms
+        )
+        return transformed_data, new_labels, new_tlabels, transforms
 
 
-class C4:
+class C4(Transform):
     def __init__(self):
+        super().__init__()
         self.name = "c4"
 
-    def __call__(self, data, labels):
+    def __call__(self, data, labels, tlabels):
         assert (
             len(data.shape) == 3
         ), "Data must have shape (n_datapoints, img_size[0], img_size[1])"
 
-        transformed_data, transforms, new_labels = [], [], []
+        transformed_data, new_labels, new_tlabels, transforms = self.define_containers(
+            tlabels
+        )
         all_transforms = np.arange(4)
         for i, x in enumerate(data):
             for t in all_transforms:
@@ -264,13 +324,14 @@ class C4:
                 transformed_data.append(xt)
                 transforms.append(t)
                 new_labels.append(labels[i])
-        transformed_data = torch.tensor(transformed_data)
-        transforms = torch.tensor(transforms)
-        new_labels = torch.tensor(new_labels)
-        return transformed_data, new_labels, transforms
+
+        transformed_data, new_labels, new_tlabels, transforms = self.reformat(
+            transformed_data, new_labels, new_tlabels, transforms
+        )
+        return transformed_data, new_labels, new_tlabels, transforms
 
 
-class Scaling:
+class Scaling(Transform):
     def __init__(
         self,
         range_min=0.5,
@@ -279,6 +340,7 @@ class Scaling:
         sample_method="linspace",
         seed=0,
     ):
+        super().__init__()
         assert sample_method in [
             "linspace",
             "random",
@@ -298,12 +360,14 @@ class Scaling:
                 np.random.uniform(self.range_min, self.range_max, size=self.n_samples)
             )
 
-    def __call__(self, data, labels):
+    def __call__(self, data, labels, tlabels):
         assert (
             len(data.shape) == 3
         ), "Data must have shape (n_datapoints, img_size[0], img_size[1])"
 
-        transformed_data, transforms, new_labels = [], [], []
+        transformed_data, new_labels, new_tlabels, transforms = self.define_containers(
+            tlabels
+        )
         select_transforms = self.get_samples()
         for i, x in enumerate(data):
             if self.sample_method == "random":
@@ -313,23 +377,27 @@ class Scaling:
                 transformed_data.append(xt)
                 transforms.append(t)
                 new_labels.append(labels[i])
-        transformed_data = torch.tensor(transformed_data)
-        transforms = torch.tensor(transforms)
-        new_labels = torch.tensor(new_labels)
-        return transformed_data, new_labels, transforms
+                for k in new_tlabels.keys():
+                    new_tlabels[k].append(tlabels[k][i])
+
+        transformed_data, new_labels, new_tlabels, transforms = self.reformat(
+            transformed_data, new_labels, new_tlabels, transforms
+        )
+        return transformed_data, new_labels, new_tlabels, transforms
 
 
-class CircleCrop:
+class CircleCrop(Transform):
     def __init__(self):
+        super().__init__()
         self.name = "circle-crop"
 
-    def __call__(self, data, labels):
+    def __call__(self, data, labels, tlabels):
         assert (
             len(data.shape) == 3
         ), "Data must have shape (n_datapoints, img_size[0], img_size[1])"
 
         img_size = data.shape[1:]
-            
+
         v, h = np.mgrid[: img_size[0], : img_size[1]]
         equation = (v - ((img_size[0] - 1) / 2)) ** 2 + (
             h - ((img_size[1] - 1) / 2)
@@ -340,7 +408,7 @@ class CircleCrop:
         transformed_data[:, ~circle] = 0.0
         transforms = torch.zeros(len(data))
 
-        return transformed_data, labels, transforms
+        return transformed_data, labels, tlabels, transforms
 
 
 class HierarchicalReflection:
