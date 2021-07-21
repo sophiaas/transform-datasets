@@ -35,23 +35,33 @@ class UniformNoise:
     
 
 class CyclicTranslation1D:
-    def __init__(self, fraction_transforms=0.1):
+    def __init__(self, fraction_transforms=0.1, sample_method='linspace', seed=0):
+        assert sample_method in ['linspace', 'random'], "sample_method must be one of ['linspace', 'random']"
+        np.random.seed(seed)
         self.fraction_transforms = fraction_transforms
+        self.sample_method = sample_method
         self.name = 'cyclic-translation-1d'
+        
+    def get_samples(self, dim):
+        n_transforms = int(self.fraction_transforms * dim)
+        if self.sample_method == 'linspace':
+            return [int(x) for x in np.linspace(0, dim - 1, n_transforms)]
+        else:
+            select_transforms = np.random.choice(
+                np.arange(dim), size=n_transforms, replace=False
+            )
+            select_transforms = sorted(select_transforms)
+            return select_transforms
 
     def __call__(self, data, labels):
         assert len(data.shape) == 2, "Data must have shape (n_datapoints, dim)"
 
         transformed_data, transforms, new_labels = [], [], []
         dim = data.shape[-1]
-        all_transforms = np.arange(dim)
-        n_transforms = int(self.fraction_transforms * len(all_transforms))
-        self.orbit_size = n_transforms
+        select_transforms = self.get_samples(dim)
         for i, x in enumerate(data):
-            select_transforms = np.random.choice(
-                all_transforms, size=n_transforms, replace=False
-            )
-            select_transforms = sorted(select_transforms)
+            if self.sample_method == 'random' and self.fraction_transforms != 1.0:
+                select_transforms = self.get_samples(dim)
             for t in select_transforms:
                 xt = translate1d(x, t)
                 transformed_data.append(xt)
@@ -64,9 +74,29 @@ class CyclicTranslation1D:
 
 
 class CyclicTranslation2D:
-    def __init__(self, fraction_transforms=0.1):
+    def __init__(self, fraction_transforms=0.1, sample_method='linspace', seed=0):
+        assert sample_method in ['linspace', 'random'], "sample_method must be one of ['linspace', 'random']"
+        np.random.seed(seed)
         self.fraction_transforms = fraction_transforms
+        self.sample_method = sample_method
         self.name = 'cyclic-translation-2d'
+        
+    def get_samples(self, dim_v, dim_h):
+        n_transforms = int(self.fraction_transforms * dim_v * dim_h)
+        if self.sample_method == 'linspace':
+            return [(int(v), int(h)) for v, h in zip(np.linspace(0, dim_v - 1, n_transforms), np.linspace(0, dim_h - 1, n_transforms))]
+        else:
+            all_transforms = list(
+                itertools.product(
+                    np.arange(dim_v),
+                    np.arange(dim_h),
+                )
+            )
+            select_transforms_idx = np.random.choice(
+                range(n_transforms), size=n_transforms, replace=False
+            )
+            select_transforms = [all_transforms[x] for x in sorted(select_transforms_idx)]
+            return select_transforms
 
     def __call__(self, data, labels):
         assert (
@@ -75,19 +105,10 @@ class CyclicTranslation2D:
 
         transformed_data, transforms, new_labels = [], [], []
         dim_v, dim_h = data.shape[-2:]
-        all_transforms = list(
-            itertools.product(
-                np.arange(dim_v),
-                np.arange(dim_h),
-            )
-        )
-        n_transforms = int(self.fraction_transforms * len(all_transforms))
-        self.orbit_size = n_transforms
+        select_transforms = self.get_samples(dim_v, dim_h)
         for i, x in enumerate(data):
-            select_transforms_idx = np.random.choice(
-                range(n_transforms), size=n_transforms, replace=False
-            )
-            select_transforms = [all_transforms[x] for x in sorted(select_transforms_idx)]
+            if self.sample_method == 'random' and self.fraction_transforms != 1.0:
+                select_transforms = self.get_samples(dim_v, dim_h)
             for tv, th in select_transforms:
                 xt = translate2d(x, tv, th)
                 transformed_data.append(xt)
@@ -118,9 +139,23 @@ class GaussianBlur:
 
 
 class SO2:
-    def __init__(self, fraction_transforms=0.1):
+    def __init__(self, fraction_transforms=0.1, sample_method='linspace', seed=0):
+        assert sample_method in ['linspace', 'random'], "sample_method must be one of ['linspace', 'random']"
+        np.random.seed(seed)
         self.fraction_transforms = fraction_transforms
+        self.sample_method = sample_method
         self.name = 'so2'
+        
+    def get_samples(self):
+        n_transforms = int(self.fraction_transforms * 360)
+        if self.sample_method == 'linspace':
+            return np.linspace(0, 359, n_transforms)
+        else:
+            select_transforms = np.random.choice(
+                np.arange(360), size=n_transforms, replace=False
+            )
+            select_transforms = sorted(select_transforms)
+            return select_transforms
 
     def __call__(self, data, labels):
         assert (
@@ -128,13 +163,10 @@ class SO2:
         ), "Data must have shape (n_datapoints, img_size[0], img_size[1])"
 
         transformed_data, transforms, new_labels = [], [], []
-        all_transforms = np.arange(360)
-        n_transforms = int(self.fraction_transforms * len(all_transforms))
+        select_transforms = self.get_samples()
         for i, x in enumerate(data):
-            select_transforms = np.random.choice(
-                all_transforms, size=n_transforms, replace=False
-            )
-            select_transforms = sorted(select_transforms)
+            if self.sample_method == 'random':
+                select_transforms = self.get_samples()
             for t in select_transforms:
                 xt = rotate(x, t)
                 transformed_data.append(xt)
@@ -147,22 +179,40 @@ class SO2:
 
 
 class SO3:
-    def __init__(self, n_axis_rotations=10, grid_type="GLQ"):
-        self.n_axis_rotations = n_axis_rotations
+    def __init__(self, n_samples=125, grid_type="GLQ", sample_method='linspace', seed=0):
+        assert sample_method in ['linspace', 'random'], "sample_method must be one of ['linspace', 'random']"
+        np.random.seed(seed)
+        self.n_samples = n_samples
         self.grid_type = grid_type
+        self.sample_method = sample_method
         self.name = 'so3'
 
-        self.alpha = np.arange(0, 360, 360 / n_axis_rotations)
-        self.beta = np.arange(0, 180, 180 / n_axis_rotations)
-        self.gamma = np.arange(0, 360, 360 / n_axis_rotations)
+    def get_samples(self):
+        if self.sample_method == 'linspace':
+            samples_per_axis = int(np.cbrt(self.n_samples))
+            alpha = np.arange(0, 360, 360 / samples_per_axis)
+            beta = np.arange(0, 180, 180 / samples_per_axis)
+            gamma = np.arange(0, 360, 360 / samples_per_axis)
+            select_transforms = list(itertools.product(alpha, beta, gamma))
+            return select_transforms
+
+        else:
+            alpha = np.random.uniform(0, 360, size=self.n_samples)
+            beta = np.random.uniform(0, 180, size=self.n_samples)
+            gamma = np.random.uniform(0, 360, size=self.n_samples)
+            select_transforms = list(zip(alpha, beta, gamma))
+            return select_transforms
+        
 
     def __call__(self, data, labels):
         assert (
             len(data.shape) == 3
         ), "Data must have shape (n_datapoints, img_size[0], img_size[1])"
         transformed_data, transforms, new_labels = [], [], []
-        select_transforms = list(itertools.product(self.alpha, self.beta, self.gamma))
+        select_transforms = self.get_samples()
         for i, x in enumerate(data):
+            if self.sample_method == 'random':
+                select_transforms = self.get_samples()
             for t in select_transforms:
                 grid = pysh.SHGrid.from_array(x.numpy(), grid=self.grid_type)
                 coeffs = grid.expand()
@@ -201,11 +251,20 @@ class C4:
 
 
 class Scaling:
-    def __init__(self, range_min=0.5, range_max=1.0, n_transforms=10):
-        self.n_transforms = n_transforms
+    def __init__(self, range_min=0.5, range_max=1.0, n_samples=10, sample_method="linspace", seed=0):
+        assert sample_method in ['linspace', 'random'], "sample_method must be one of ['linspace', 'random']"
+        np.random.seed(seed)
+        self.n_samples = n_samples
         self.range_min = range_min
         self.range_max = range_max
+        self.sample_method = sample_method
         self.name = 'scaling'
+        
+    def get_samples(self):
+        if self.sample_method == 'linspace':
+            return np.linspace(self.range_min, self.range_max, self.n_samples)
+        else:
+            return sorted(np.random.uniform(self.range_min, self.range_max, size=self.n_samples))
 
     def __call__(self, data, labels):
         assert (
@@ -213,8 +272,10 @@ class Scaling:
         ), "Data must have shape (n_datapoints, img_size[0], img_size[1])"
 
         transformed_data, transforms, new_labels = [], [], []
-        select_transforms = np.linspace(self.range_min, self.range_max, self.n_transforms)
+        select_transforms = self.get_samples()
         for i, x in enumerate(data):
+            if self.sample_method == 'random':
+                select_transforms = self.get_samples()
             for t in select_transforms:
                 xt = rescale(x, t, data.shape[-1])
                 transformed_data.append(xt)
