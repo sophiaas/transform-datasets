@@ -1,9 +1,10 @@
 import torch
 from torch.utils.data import Dataset
+from collections import OrderedDict
 
 
-class TransformDataset:
-    def __init__(self, pattern_generator, transforms, n_classes):
+class TransformDataset(Dataset):
+    def __init__(self, dataset, transforms):
         """
         Arguments
         ---------
@@ -15,25 +16,27 @@ class TransformDataset:
         n_classes (int):
             number of classes to generate
         """
-        self.pattern_generator = pattern_generator
         self.transforms = transforms
-        self.n_classes = n_classes
+        self.gen_transformations(dataset)
 
-    def gen_dataset(self):
+    def gen_transformations(self, dataset):
         data, labels, transformations = [], [], []
-        canonical = {}
-        for c in range(self.n_classes):
-            x = self.pattern_generator.gen_pattern()
-            canonical[c] = x
+        transformations = OrderedDict({x.name: [] for x in self.transforms})
+        for x, y in dataset:
             xt = x.copy()
-            ts = []
             for transform in self.transforms:
                 xt, t = transform(xt)
-                ts.append(t)
-            data.append(xt)
-            labels.append(c)
-            transformations.append(ts)
+                transformations[self.transforms.name] += t
+            data += xt
+            labels += [y] * len(xt)
         self.data = data
         self.labels = labels
         self.transformations = transformations
-        self.canonical = canonical
+
+    def __getitem__(self, idx):
+        x = self.data[idx]
+        y = self.labels[idx]
+        return x, y
+
+    def __len__(self):
+        return len(self.data)
