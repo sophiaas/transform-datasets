@@ -1,11 +1,12 @@
 import numpy as np
 import torch
 from torch.utils.data import Dataset
-from utils import translate1d, translate2d
+from transform_datasets.utils import translate1d, translate2d
+import pyshtools as pysh
 
 
-class PatternDataset:
-    def __init__(self, n_classes):
+class PatternDataset(Dataset):
+    def __init__(self, n_classes=None):
         self.n_classes = n_classes
 
     def gen_pattern(self):
@@ -20,7 +21,12 @@ class PatternDataset:
             labels.append(y)
         self.data = torch.tensor(data)
         self.labels = torch.tensor(labels)
-
+        
+    def __getitem__(self, idx):
+        x = self.data[idx]
+        y = self.labels[idx]
+        return x, y
+    
 
 class HarmonicsS1(PatternDataset):
     def __init__(
@@ -30,7 +36,7 @@ class HarmonicsS1(PatternDataset):
         max_frequency=16,
         real=True,
         seed=0,
-        n_classes=100,
+        n_classes=10,
     ):
 
         super().__init__()
@@ -58,7 +64,7 @@ class HarmonicsS1(PatternDataset):
             x = x.real
         x -= np.mean(x)
         x /= np.max(abs(x))
-        return d
+        return x
 
 
 class HarmonicsS1xS1(PatternDataset):
@@ -67,7 +73,7 @@ class HarmonicsS1xS1(PatternDataset):
         img_size=(32, 32),
         n_classes=10,
         n_harmonics=5,
-        max_frequency=16,
+        max_frequency=5,
         seed=0,
         real=True,
     ):
@@ -78,7 +84,6 @@ class HarmonicsS1xS1(PatternDataset):
         self.max_frequency = max_frequency
         self.n_classes = n_classes
         self.seed = seed
-        self.ravel = ravel
         self.real = real
         self.n_harmonics = n_harmonics
 
@@ -99,8 +104,8 @@ class HarmonicsS1xS1(PatternDataset):
             )
             amplitude = np.random.uniform(0, 1)
             coords_h, coords_v = (
-                translate2d(self.grid_h, phase_h, phase_v),
-                translate2d(self.grid_v, phase_h, phase_v),
+                translate2d(self.grid_h, phase_v, phase_h),
+                translate2d(self.grid_v, phase_v, phase_h),
             )
             f = np.cos(coords_h * omega_h + coords_v * omega_v) + 1j * np.sin(
                 coords_h * omega_h + coords_v * omega_v
@@ -118,7 +123,7 @@ class HarmonicsS2(PatternDataset):
         self,
         l_max_dim=50,
         l_max_sample=20,
-        n_classes=100,
+        n_classes=10,
         n_harmonics=10,
         kind="real",
         seed=0,
@@ -135,19 +140,17 @@ class HarmonicsS2(PatternDataset):
         self.seed = seed
         self.grid_type = grid_type
         self.name = "harmonics-s2"
-
+        self.gen_dataset()
+        
     def gen_dataset(self):
         data = []
-        data_sh = []
         labels = []
         for y in range(self.n_classes):
-            x, x_sh = self.gen_pattern()
+            x = self.gen_pattern()
             data.append(x)
             labels.append(y)
         self.data = torch.tensor(data)
-        self.data_sh = torch.tensor(data_sh)
         self.labels = torch.tensor(labels)
-        self.img_size = self.data.shape[1:]
 
     def gen_pattern(self):
         coeffs = pysh.SHCoeffs.from_zeros(
@@ -160,7 +163,7 @@ class HarmonicsS2(PatternDataset):
             m.append(np.random.randint(-l[i], l[i] + 1))  # order
         coeffs.set_coeffs(vals, l, m)
         pattern = coeffs.expand(grid=self.grid_type)
-        return pattern.data, pattern
+        return pattern.data
 
 
 class HarmonicsDisk:
@@ -172,26 +175,39 @@ class HarmonicsDisk:
 
 
 class RandomUniform(PatternDataset):
-    def __init__(self, size=(32,), seed=0, min=-1.0, max=1.0):
+    def __init__(self, 
+                 size=(32,), 
+                 seed=0, 
+                 magnitude=1.0, 
+                 n_classes=10):
         super().__init__()
         np.random.seed(seed)
         self.name = "random-uniform"
         self.size = size
-        self.min = min
-        self.max = max
+        self.magnitude = magnitude
+        self.n_classes = n_classes
+        self.gen_dataset()
 
     def gen_pattern(self):
-        return np.random.uniform(self.min, self.max, size=self.size)
+        return np.random.uniform(-self.magnitude, self.magnitude, size=self.size)
 
 
 class RandomNormal(PatternDataset):
-    def __init__(self, size=(32,), seed=0, mean=0.0, std=1.0):
+    def __init__(self, 
+                 size=(32,), 
+                 seed=0, 
+                 mean=0.0, 
+                 std=1.0,
+                 n_classes=10):
+        
         super().__init__()
         np.random.seed(seed)
         self.name = "random-normal"
         self.size = size
         self.mean = mean
         self.std = std
+        self.n_classes = n_classes
+        self.gen_dataset()
 
     def gen_pattern(self):
         return np.random.normal(loc=self.mean, scale=self.std, size=self.size)

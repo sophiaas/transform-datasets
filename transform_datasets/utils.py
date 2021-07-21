@@ -13,7 +13,7 @@ def translate1d(x, t):
     return np.array(new_x)
 
 
-def translate2d(self, img, v=0, h=0):
+def translate2d(img, v=0, h=0):
     """
     Given an image and offset v, h returns a cyclically translated image up in v and right in h.
     """
