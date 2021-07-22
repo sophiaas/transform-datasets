@@ -8,13 +8,11 @@ class TransformDataset(Dataset):
         """
         Arguments
         ---------
-        pattern_generator (obj):
+        dataset (obj):
             Object from patterns.natural or patterns.synthetic
         transforms (list of obj):
-            List of objects from transformations. the order of the objects
+            List of objects from transformations. The order of the objects
             determines the order in which they are applied.
-        n_classes (int):
-            Number of classes to generate
         return_tlabels (bool):
             Whether to return transform labels on the __getitem__ method.
         """
@@ -25,12 +23,14 @@ class TransformDataset(Dataset):
         self.gen_transformations(dataset)
 
     def gen_transformations(self, dataset):
-        transform_dict = OrderedDict({x.name: [] for x in self.transforms})
+        transform_dict = OrderedDict()
         transformed_data = dataset.data.clone()
         new_labels = dataset.labels.clone()
         for transform in self.transforms:
-            transformed_data, new_labels, t = transform(transformed_data, new_labels)
-            transform_dict[transform.name] += t
+            transformed_data, new_labels, transform_dict, t = transform(
+                transformed_data, new_labels, transform_dict
+            )
+            transform_dict[transform.name] = t
         self.data = transformed_data
         self.labels = new_labels
         self.transform_labels = transform_dict

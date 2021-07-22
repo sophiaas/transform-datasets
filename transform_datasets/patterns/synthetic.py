@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 from torch.utils.data import Dataset
-from transform_datasets.utils import translate1d, translate2d
+from transform_datasets.transforms.functional import translate1d, translate2d
 import pyshtools as pysh
 
 
@@ -21,12 +21,12 @@ class PatternDataset(Dataset):
             labels.append(y)
         self.data = torch.tensor(data)
         self.labels = torch.tensor(labels)
-        
+
     def __getitem__(self, idx):
         x = self.data[idx]
         y = self.labels[idx]
         return x, y
-    
+
 
 class HarmonicsS1(PatternDataset):
     def __init__(
@@ -141,7 +141,7 @@ class HarmonicsS2(PatternDataset):
         self.grid_type = grid_type
         self.name = "harmonics-s2"
         self.gen_dataset()
-        
+
     def gen_dataset(self):
         data = []
         labels = []
@@ -175,11 +175,7 @@ class HarmonicsDisk:
 
 
 class RandomUniform(PatternDataset):
-    def __init__(self, 
-                 size=(32,), 
-                 seed=0, 
-                 magnitude=1.0, 
-                 n_classes=10):
+    def __init__(self, size=(32,), seed=0, magnitude=1.0, n_classes=10):
         super().__init__()
         np.random.seed(seed)
         self.name = "random-uniform"
@@ -193,13 +189,8 @@ class RandomUniform(PatternDataset):
 
 
 class RandomNormal(PatternDataset):
-    def __init__(self, 
-                 size=(32,), 
-                 seed=0, 
-                 mean=0.0, 
-                 std=1.0,
-                 n_classes=10):
-        
+    def __init__(self, size=(32,), seed=0, mean=0.0, std=1.0, n_classes=10):
+
         super().__init__()
         np.random.seed(seed)
         self.name = "random-normal"

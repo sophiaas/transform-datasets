@@ -3,17 +3,14 @@ import pandas as pd
 import torch
 from torch.utils.data import Dataset
 
+
 class MNIST(Dataset):
-    '''
+    """
     Dataset object for the MNIST dataset.
     Takes the MNIST file path, then loads, standardizes, and saves it internally.
-    '''
-    
-    def __init__(
-        self,
-        path,
-        ordered=False
-    ):
+    """
+
+    def __init__(self, path, ordered=False):
 
         super().__init__()
 
@@ -30,15 +27,13 @@ class MNIST(Dataset):
         mnist = mnist - mnist.mean(axis=1, keepdims=True)
         mnist = mnist / mnist.std(axis=1, keepdims=True)
         mnist = mnist.reshape((len(mnist), 28, 28))
-
         if ordered:
             sort_idx = np.argsort(labels)
             mnist = mnist[sort_idx]
             labels = labels[sort_idx]
-            
+
         self.data = torch.Tensor(mnist)
         self.labels = torch.Tensor(labels).long()
-
 
     def __getitem__(self, idx):
         x = self.data[idx]
