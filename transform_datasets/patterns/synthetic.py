@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 from torch.utils.data import Dataset
-from transform_datasets.utils import translate1d, translate2d
+from transform_datasets.transforms.functional import translate1d, translate2d
 import pyshtools as pysh
 
 

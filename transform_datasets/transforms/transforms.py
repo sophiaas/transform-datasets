@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 from scipy import ndimage
-from transform_datasets.utils import translate1d, translate2d, rescale
+from transform_datasets.transforms.functional import translate1d, translate2d, rescale
 from skimage.transform import rotate
 import pyshtools as pysh
 import itertools
