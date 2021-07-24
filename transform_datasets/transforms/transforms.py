@@ -30,7 +30,7 @@ class UniformNoise(Transform):
     def __init__(self, seed=0, magnitude=1.0, n_samples=10):
         super().__init__()
         np.random.seed(seed)
-        self.name = "random-uniform"
+        self.name = "uniform-noise"
         self.magnitude = magnitude
         self.n_samples = n_samples
 
