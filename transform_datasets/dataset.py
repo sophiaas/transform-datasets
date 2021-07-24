@@ -4,7 +4,7 @@ from collections import OrderedDict
 
 
 class TransformDataset(Dataset):
-    def __init__(self, dataset, transforms, return_tlabels=False):
+    def __init__(self, dataset, transforms):
         """
         Arguments
         ---------
@@ -13,13 +13,10 @@ class TransformDataset(Dataset):
         transforms (list of obj):
             List of objects from transformations. The order of the objects
             determines the order in which they are applied.
-        return_tlabels (bool):
-            Whether to return transform labels on the __getitem__ method.
         """
         if type(transforms) != list:
             transforms = [transforms]
         self.transforms = transforms
-        self.return_tlabels = return_tlabels
         self.gen_transformations(dataset)
 
     def gen_transformations(self, dataset):
@@ -38,11 +35,7 @@ class TransformDataset(Dataset):
     def __getitem__(self, idx):
         x = self.data[idx]
         y = self.labels[idx]
-        if self.return_tlabels:
-            t = self.transform_labels[idx]
-            return x, y, t
-        else:
-            return x, y
+        return x, y
 
     def __len__(self):
         return len(self.data)

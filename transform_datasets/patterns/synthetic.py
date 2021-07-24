@@ -6,8 +6,15 @@ import pyshtools as pysh
 
 
 class PatternDataset(Dataset):
-    def __init__(self, n_classes=None):
-        self.n_classes = n_classes
+    def __init__(self, **kwargs):
+        assert "name" in kwargs, "Keyword arguments must include keyword 'name'."
+        self.set_attributes(kwargs)
+
+    def set_attributes(self, kwargs):
+        for k, v in kwargs.items():
+            setattr(self, k, v)
+            if k == "seed":
+                np.random.seed(v)
 
     def gen_pattern(self):
         raise NotImplementedError
@@ -31,6 +38,7 @@ class PatternDataset(Dataset):
 class HarmonicsS1(PatternDataset):
     def __init__(
         self,
+        name="harmonics-s1",
         dim=32,
         n_harmonics=5,
         max_frequency=16,
@@ -39,16 +47,16 @@ class HarmonicsS1(PatternDataset):
         n_classes=10,
     ):
 
-        super().__init__()
-        np.random.seed(seed)
-        self.dim = dim
-        self.n_harmonics = n_harmonics
-        self.max_frequency = max_frequency
-        self.seed = seed
-        self.real = real
-        self.name = "harmonics-s1"
-        self.n_classes = n_classes
-        self.coordinates = np.arange(0, np.pi * 2, np.pi * 2 / dim)
+        super().__init__(
+            name=name,
+            dim=dim,
+            n_harmonics=n_harmonics,
+            max_frequency=max_frequency,
+            real=real,
+            seed=seed,
+            n_classes=n_classes,
+        )
+        self.coordinates = np.arange(0, np.pi * 2, np.pi * 2 / self.dim)
         self.gen_dataset()
 
     def gen_pattern(self):
@@ -70,6 +78,7 @@ class HarmonicsS1(PatternDataset):
 class HarmonicsS1xS1(PatternDataset):
     def __init__(
         self,
+        name="harmonics-s1xs1",
         img_size=(32, 32),
         n_classes=10,
         n_harmonics=5,
@@ -77,15 +86,15 @@ class HarmonicsS1xS1(PatternDataset):
         seed=0,
         real=True,
     ):
-        super().__init__()
-        np.random.seed(seed)
-        self.name = "harmonics-s1xs1"
-        self.img_size = img_size
-        self.max_frequency = max_frequency
-        self.n_classes = n_classes
-        self.seed = seed
-        self.real = real
-        self.n_harmonics = n_harmonics
+        super().__init__(
+            name=name,
+            img_size=img_size,
+            n_classes=n_classes,
+            n_harmonics=n_harmonics,
+            max_frequency=max_frequency,
+            seed=seed,
+            real=real,
+        )
 
         self.coordinates_v = np.linspace(0, np.pi * 2, self.img_size[0], endpoint=False)
         self.coordinates_h = np.linspace(0, np.pi * 2, self.img_size[1], endpoint=False)
@@ -121,6 +130,7 @@ class HarmonicsS1xS1(PatternDataset):
 class HarmonicsS2(PatternDataset):
     def __init__(
         self,
+        name="harmonics-s2",
         l_max_dim=50,
         l_max_sample=20,
         n_classes=10,
@@ -129,17 +139,16 @@ class HarmonicsS2(PatternDataset):
         seed=0,
         grid_type="GLQ",
     ):
-        super().__init__()
-        np.random.seed(seed)
-
-        self.l_max_dim = l_max_dim
-        self.l_max_sample = l_max_sample
-        self.n_classes = n_classes
-        self.n_harmonics = n_harmonics
-        self.kind = kind
-        self.seed = seed
-        self.grid_type = grid_type
-        self.name = "harmonics-s2"
+        super().__init__(
+            name=name,
+            l_max_dim=l_max_dim,
+            l_max_sample=l_max_sample,
+            n_classes=n_classes,
+            n_harmonics=n_harmonics,
+            kind=kind,
+            seed=seed,
+            grid_type=grid_type,
+        )
         self.gen_dataset()
 
     def gen_dataset(self):
@@ -175,13 +184,12 @@ class HarmonicsDisk:
 
 
 class RandomUniform(PatternDataset):
-    def __init__(self, size=(32,), seed=0, magnitude=1.0, n_classes=10):
-        super().__init__()
-        np.random.seed(seed)
-        self.name = "random-uniform"
-        self.size = size
-        self.magnitude = magnitude
-        self.n_classes = n_classes
+    def __init__(
+        self, name="random-uniform", size=(32,), seed=0, magnitude=1.0, n_classes=10
+    ):
+        super().__init__(
+            name=name, size=size, seed=seed, magnitude=magnitude, n_classes=n_classes
+        )
         self.gen_dataset()
 
     def gen_pattern(self):
@@ -189,15 +197,13 @@ class RandomUniform(PatternDataset):
 
 
 class RandomNormal(PatternDataset):
-    def __init__(self, size=(32,), seed=0, mean=0.0, std=1.0, n_classes=10):
+    def __init__(
+        self, name="random-normal", size=(32,), seed=0, mean=0.0, std=1.0, n_classes=10
+    ):
 
-        super().__init__()
-        np.random.seed(seed)
-        self.name = "random-normal"
-        self.size = size
-        self.mean = mean
-        self.std = std
-        self.n_classes = n_classes
+        super().__init__(
+            name=name, size=size, seed=seed, mean=mean, std=std, n_classes=n_classes
+        )
         self.gen_dataset()
 
     def gen_pattern(self):
