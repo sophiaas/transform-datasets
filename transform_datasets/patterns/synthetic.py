@@ -5,7 +5,7 @@ from transform_datasets.transforms.functional import translate1d, translate2d
 import pyshtools as pysh
 
 
-class PatternDataset(Dataset):
+class PatternDataset:
     def __init__(self, **kwargs):
         assert "name" in kwargs, "Keyword arguments must include keyword 'name'."
         self.set_attributes(kwargs)

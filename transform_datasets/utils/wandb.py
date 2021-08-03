@@ -1,4 +1,8 @@
-from transform_datasets.utils import config_to_hash, gen_dataset, flatten_dict
+from transform_datasets.utils import (
+    config_to_hash,
+    gen_dataset,
+    flatten_dict,
+)
 import wandb
 import os
 import torch
@@ -17,7 +21,6 @@ def get_names(config, project, entity):
 
 def get_artifact(config, project, entity):
     dataset_name, dataset_type, dataset_hash = get_names(config, project, entity)
-
     path = "{}/{}/{}:{}".format(entity, project, dataset_name, dataset_hash)
     api = wandb.Api(overrides={"project": project, "entity": entity})
     artifact = api.artifact(
@@ -64,7 +67,16 @@ def load_dataset(config, project, entity):
     try:
         artifact = get_artifact(config, project, entity)
         path = artifact.download()
-        data = torch.load(os.path.join(path, "dataset.pt"))
-        return data
+        dataset = torch.load(os.path.join(path, "dataset.pt"))
+        return dataset
     except:
         raise FileNotFoundError
+
+
+def load_or_create_dataset(config, project, entity):
+    try:
+        dataset = load_dataset(config, project, entity)
+    except:
+        create_dataset(config, project, entity)
+        dataset = load_dataset(config, project, entity)
+    return dataset

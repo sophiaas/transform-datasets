@@ -1,9 +1,8 @@
 import torch
-from torch.utils.data import Dataset
 from collections import OrderedDict
 
 
-class TransformDataset(Dataset):
+class TransformDataset:
     def __init__(self, dataset, transforms):
         """
         Arguments
@@ -18,6 +17,10 @@ class TransformDataset(Dataset):
             transforms = [transforms]
         self.transforms = transforms
         self.gen_transformations(dataset)
+        if len(self.data.shape) == 3:
+            self.img_size = tuple(self.data.shape[1:])
+        else:
+            self.dim = self.data.shape[-1]
 
     def gen_transformations(self, dataset):
         transform_dict = OrderedDict()

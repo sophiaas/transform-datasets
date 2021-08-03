@@ -44,7 +44,6 @@ def flatten_dict(dd, separator=".", prefix=""):
 def config_to_hash(config):
     if type(config) != dict:
         config = dict(config)
-
     flat_config = pd.json_normalize(config).to_dict()
     flat_config = sorted(flat_config.items())
     config_hash = hashlib.md5(jsonpickle.encode(flat_config).encode("utf-8")).digest()
@@ -75,3 +74,12 @@ def gen_dataset(config):
     ]
     t_dataset = TransformDataset(dataset, transforms)
     return t_dataset
+
+
+#
+#
+# def td_config_to_params(config):
+#     config["dataset"] = config_to_params(config["dataset"])
+#     for t in config["transforms"]:
+#         config["transforms"][t] = config_to_params(config["transforms"][t])
+#     return config
