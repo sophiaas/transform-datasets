@@ -99,6 +99,7 @@ class HarmonicsS1xS1(PatternDataset):
         self.coordinates_v = np.linspace(0, np.pi * 2, self.img_size[0], endpoint=False)
         self.coordinates_h = np.linspace(0, np.pi * 2, self.img_size[1], endpoint=False)
         self.grid_h, self.grid_v = np.meshgrid(self.coordinates_h, self.coordinates_v)
+        self.dim = img_size[0] * img_size[1]
         self.gen_dataset()
 
     def gen_pattern(self):
