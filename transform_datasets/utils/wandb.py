@@ -9,7 +9,7 @@ import torch
 
 
 def get_names(config, project, entity):
-    dataset_type = config["dataset"]["type"].__name__
+    dataset_type = config["pattern"]["type"].__name__
     dataset_hash = config_to_hash(config)
 
     transform_name = "-".join(
@@ -73,10 +73,12 @@ def load_dataset(config, project, entity):
         raise FileNotFoundError
 
 
-def load_or_create_dataset(config, project, entity):
+def load_or_create_dataset(config, project, entity, run=None):
     try:
         dataset = load_dataset(config, project, entity)
     except:
-        create_dataset(config, project, entity)
+        create_dataset(config, project, entity, run=run)
         dataset = load_dataset(config, project, entity)
     return dataset
+
+

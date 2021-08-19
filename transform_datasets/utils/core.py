@@ -56,7 +56,7 @@ def gen_dataset(config):
     structure:
 
     config = {
-        "dataset": {"type": obj, "params": {}},
+        "pattern": {"type": obj, "params": {}},
         "transforms": {
             "0": {"type": obj, "params": {}},
             "1": {"type": obj, "params": {}}
@@ -67,13 +67,13 @@ def gen_dataset(config):
     or transform class. The "params" parameter specifies a dictionary containing
     the keyword arguments needed to instantiate the class.
     """
-    dataset = config["dataset"]["type"](**config["dataset"]["params"])
+    pattern = config["pattern"]["type"](**config["pattern"]["params"])
     transforms = [
         config["transforms"][k]["type"](**config["transforms"][k]["params"])
         for k in sorted(config["transforms"])
     ]
-    t_dataset = TransformDataset(dataset, transforms)
-    return t_dataset
+    dataset = TransformDataset(pattern, transforms)
+    return dataset
 
 
 #

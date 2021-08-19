@@ -46,7 +46,7 @@ def dataset_sweep():
         for k in config_dict["transforms"]:
             new_config["transforms"][k]["type"] = config_dict["transforms"][k]["type"]
 
-        dataset = create_dataset(new_config, PROJECT, ENTITY, run)
+        dataset = load_or_create_dataset(new_config, PROJECT, ENTITY, run)
 
 
 sweep_id = wandb.sweep(sweep_config, project=PROJECT, entity=ENTITY)
