@@ -246,7 +246,7 @@ class SO2(Transform):
 
 class SO3(Transform):
     def __init__(
-        self, n_samples=125, grid_type="GLQ", sample_method="linspace", seed=0
+        self, n_samples=10, grid_type="GLQ", sample_method="linspace", seed=0
     ):
         super().__init__()
         assert sample_method in [
@@ -410,6 +410,17 @@ class CircleCrop(Transform):
 
         return transformed_data, labels, tlabels, transforms
 
+    
+class Ravel(Transform):
+    def __init__(self):
+        super().__init__()
+        self.name = 'ravel'
+        
+    def __call__(self, data, labels, tlabels):
+        transformed_data = data.reshape(data.shape[0], -1)
+        transforms = torch.zeros(len(data))
+        return transformed_data, labels, tlabels, transforms
+    
 
 class HierarchicalReflection:
     def __init__(self):
