@@ -1,5 +1,5 @@
 import wandb
-from transform_datasets.utils.wandb import create_dataset
+from transform_datasets.utils.wandb import load_or_create_dataset, create_dataset
 from transform_datasets.utils.core import flatten_dict, nest_dict
 from transform_datasets.patterns.synthetic import *
 from transform_datasets.transforms import *
@@ -8,7 +8,7 @@ from transform_datasets.transforms import *
 PROJECT = "datasets"
 ENTITY = "naturalcomputation"
 
-dataset = {
+pattern = {
     "type": HarmonicsS1,
     "params": {"dim": 256, "n_classes": 10, "seed": 0},
 }
@@ -22,7 +22,7 @@ transforms = {
 }
 
 
-config_dict = {"dataset": dataset, "transforms": transforms}
+config_dict = {"pattern": pattern, "transforms": transforms}
 
 config = flatten_dict(config_dict)
 
@@ -42,7 +42,7 @@ def dataset_sweep():
         new_config = dict(wandb.config)
         new_config = nest_dict(new_config)
 
-        new_config["dataset"]["type"] = config_dict["dataset"]["type"]
+        new_config["pattern"]["type"] = config_dict["pattern"]["type"]
         for k in config_dict["transforms"]:
             new_config["transforms"][k]["type"] = config_dict["transforms"][k]["type"]
 
