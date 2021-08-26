@@ -46,6 +46,7 @@ def create_dataset(config, project, entity, run=None):
             finish_run = True
         else:
             finish_run = False
+            
         dataset_name, dataset_type, dataset_hash = get_names(config, project, entity)
 
         artifact = wandb.Artifact(
