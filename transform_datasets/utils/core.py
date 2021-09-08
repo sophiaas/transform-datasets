@@ -67,11 +67,23 @@ def gen_dataset(config):
     or transform class. The "params" parameter specifies a dictionary containing
     the keyword arguments needed to instantiate the class.
     """
+    # Catch for datasets and transforms that have no parameters
+    if "params" not in config["pattern"]:
+        config["pattern"]["params"] = {}
+    for t in config["transforms"]:
+        if "params" not in config["transforms"][t]:
+            config["transforms"][t]["params"] = {}
+            
+    # Instantiate pattern object
     pattern = config["pattern"]["type"](**config["pattern"]["params"])
+    
+    # Instantiate transform objects
     transforms = [
         config["transforms"][k]["type"](**config["transforms"][k]["params"])
         for k in sorted(config["transforms"])
     ]
+    
+    # Generate dataset
     dataset = TransformDataset(pattern, transforms)
     return dataset
 
