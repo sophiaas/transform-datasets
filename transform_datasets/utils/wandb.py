@@ -21,6 +21,8 @@ def get_names(config, project, entity):
 
 def get_artifact(config, project, entity):
     dataset_name, dataset_type, dataset_hash = get_names(config, project, entity)
+    print(dataset_hash)
+    print(config)
     path = "{}/{}/{}:{}".format(entity, project, dataset_name, dataset_hash)
     api = wandb.Api(overrides={"project": project, "entity": entity})
     artifact = api.artifact(
@@ -52,7 +54,6 @@ def create_dataset(config, project, entity, run=None):
         artifact = wandb.Artifact(
             name=dataset_name, type=dataset_type, metadata=dict(config)
         )
-
         dataset = gen_dataset(config)
         with artifact.new_file("dataset.pt", mode="wb") as file:
             torch.save(dataset, file)
@@ -71,7 +72,7 @@ def load_dataset(config, project, entity):
         dataset = torch.load(os.path.join(path, "dataset.pt"))
         return dataset
     except:
-        raise FileNotFoundError
+        raise FileNotFoundError("Check the config to ensure it matches an artifact that has previously been logged.")
 
 
 def load_or_create_dataset(config, project, entity, run=None):
