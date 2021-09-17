@@ -5,6 +5,7 @@ import pandas as pd
 import wandb
 import torch
 import os
+import numpy as np
 
 
 def nest_dict(dict1):
@@ -67,6 +68,9 @@ def gen_dataset(config):
     or transform class. The "params" parameter specifies a dictionary containing
     the keyword arguments needed to instantiate the class.
     """
+    if "seed" in config:
+        torch.manual_seed(config['seed'])
+        np.random.seed(config['seed'])
     # Catch for datasets and transforms that have no parameters
     if "params" not in config["pattern"]:
         config["pattern"]["params"] = {}
