@@ -27,9 +27,8 @@ class Transform:
 
 
 class UniformNoise(Transform):
-    def __init__(self, seed=0, magnitude=1.0, n_samples=10):
+    def __init__(self, magnitude=1.0, n_samples=10):
         super().__init__()
-        np.random.seed(seed)
         self.name = "uniform-noise"
         self.magnitude = magnitude
         self.n_samples = n_samples
@@ -56,13 +55,12 @@ class UniformNoise(Transform):
 
 
 class CyclicTranslation1D(Transform):
-    def __init__(self, fraction_transforms=0.1, sample_method="linspace", seed=0):
+    def __init__(self, fraction_transforms=0.1, sample_method="linspace"):
         super().__init__()
         assert sample_method in [
             "linspace",
             "random",
         ], "sample_method must be one of ['linspace', 'random']"
-        np.random.seed(seed)
         self.fraction_transforms = fraction_transforms
         self.sample_method = sample_method
         self.name = "cyclic-translation-1d"
@@ -105,13 +103,12 @@ class CyclicTranslation1D(Transform):
 
 
 class CyclicTranslation2D(Transform):
-    def __init__(self, fraction_transforms=0.1, sample_method="linspace", seed=0):
+    def __init__(self, fraction_transforms=0.1, sample_method="linspace"):
         super().__init__()
         assert sample_method in [
             "linspace",
             "random",
         ], "sample_method must be one of ['linspace', 'random']"
-        np.random.seed(seed)
         self.fraction_transforms = fraction_transforms
         self.sample_method = sample_method
         self.name = "cyclic-translation-2d"
@@ -195,13 +192,12 @@ class GaussianBlur(Transform):
 
 
 class SO2(Transform):
-    def __init__(self, fraction_transforms=0.1, sample_method="linspace", seed=0):
+    def __init__(self, fraction_transforms=0.1, sample_method="linspace"):
         super().__init__()
         assert sample_method in [
             "linspace",
             "random",
         ], "sample_method must be one of ['linspace', 'random']"
-        np.random.seed(seed)
         self.fraction_transforms = fraction_transforms
         self.sample_method = sample_method
         self.name = "so2"
@@ -246,14 +242,13 @@ class SO2(Transform):
 
 class SO3(Transform):
     def __init__(
-        self, n_samples=10, grid_type="GLQ", sample_method="linspace", seed=0
+        self, n_samples=10, grid_type="GLQ", sample_method="linspace"
     ):
         super().__init__()
         assert sample_method in [
             "linspace",
             "random",
         ], "sample_method must be one of ['linspace', 'random']"
-        np.random.seed(seed)
         self.n_samples = n_samples
         self.grid_type = grid_type
         self.sample_method = sample_method
@@ -338,14 +333,12 @@ class Scaling(Transform):
         range_max=1.0,
         n_samples=10,
         sample_method="linspace",
-        seed=0,
     ):
         super().__init__()
         assert sample_method in [
             "linspace",
             "random",
         ], "sample_method must be one of ['linspace', 'random']"
-        np.random.seed(seed)
         self.n_samples = n_samples
         self.range_min = range_min
         self.range_max = range_max

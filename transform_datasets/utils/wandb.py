@@ -6,6 +6,7 @@ from transform_datasets.utils import (
 import wandb
 import os
 import torch
+import numpy as np
 
 
 def get_names(config, project, entity):
@@ -48,6 +49,10 @@ def create_dataset(config, project, entity, run=None):
             finish_run = True
         else:
             finish_run = False
+            
+        if "seed" in config:
+            torch.manual_seed(config["seed"])
+            np.random.seed(config["seed"])
             
         dataset_name, dataset_type, dataset_hash = get_names(config, project, entity)
 
