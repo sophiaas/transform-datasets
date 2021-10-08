@@ -17,7 +17,7 @@ def translate2d(img, v=0, h=0):
     """
     Given an image and offset v, h returns a cyclically translated image up in v and right in h.
     """
-    new_img = np.zeros(img.shape)
+    new_img = np.zeros_like(img)
     for i in range(img.shape[0]):
         for j in range(img.shape[1]):
             oldi = (i - v) % img.shape[0]

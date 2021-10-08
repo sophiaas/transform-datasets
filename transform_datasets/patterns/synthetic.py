@@ -3,6 +3,8 @@ import torch
 from torch.utils.data import Dataset
 from transform_datasets.transforms.functional import translate1d, translate2d
 import pyshtools as pysh
+from PIL import Image
+import os
 
 
 class PatternDataset:
@@ -31,7 +33,7 @@ class PatternDataset:
         x = self.data[idx]
         y = self.labels[idx]
         return x, y
-
+    
 
 class HarmonicsS1(PatternDataset):
     def __init__(
@@ -201,3 +203,87 @@ class RandomNormal(PatternDataset):
 
     def gen_pattern(self):
         return np.random.normal(loc=self.mean, scale=self.std, size=self.size)
+    
+    
+class UniformPhasors(PatternDataset):
+    
+    def __init__(self,
+                 dim=32,
+                 n_classes=10,
+                 name="uniform-phasors"):
+        
+        super().__init__(dim=dim, 
+                         n_classes=n_classes,
+                         name=name)
+        
+        self.gen_dataset()
+        
+    def gen_pattern(self):
+        phase = np.random.uniform(-np.pi, np.pi, size=self.dim)
+        return np.exp(1j * phase)
+
+
+class NaturalImageSlices(PatternDataset):
+    
+    def __init__(self,
+                 name="natural-image-slices",
+                 path=os.path.expanduser("~/data/curated-natural-images/images/"),
+                 n_classes=10,
+                 slice_length=256,
+                 images=range(94),
+                 color=False,
+                 normalize=True,
+                 min_contrast=0.2):
+        
+        super().__init__(name=name,
+                         path=path,
+                         n_classes=n_classes,
+                         slice_length=slice_length,
+                         images=images,
+                         color=color,
+                         normalize=normalize,
+                         min_contrast=min_contrast)
+        
+        self.img_size = (512, 512)
+        
+        if self.img_size[0] - slice_length < 0 or self.img_size[1] - slice_length < 0:
+            raise ValueError("Slice length must be <= 512")
+            
+        self.max_start = (self.img_size[0] - slice_length, self.img_size[1] - slice_length)
+        self.gen_dataset()
+        
+    def gen_pattern(self):
+        idx = np.random.choice(self.images)
+        n_zeros = 4 - len(str(idx))
+        str_idx = "0" * n_zeros + str(idx)
+        img = np.asarray(Image.open(self.path + "{}.png".format(str_idx)))
+
+        if not self.color:
+            img = img.mean(axis=-1)
+
+        slice_orientation = np.random.choice(range(2))
+        
+        low_contrast = True
+        max_attempts = 50
+        attempt = 0
+        while low_contrast:
+            if attempt >= max_attempts:
+                print("Max attempts reached for given min_contrast level. Try lowering min_contrast.")
+                break
+            if slice_orientation == 0:
+                row = np.random.randint(self.img_size[0])
+                slice_start = np.random.choice(range(self.max_start[0]))
+                img_slice = img[row, slice_start:slice_start+self.slice_length]
+            else:
+                col = np.random.randint(self.img_size[1])
+                slice_start = np.random.choice(range(self.max_start[1]))
+                img_slice = img[slice_start:slice_start+self.slice_length, col]
+            if img_slice.std() >= self.min_contrast:
+                low_contrast = False
+            attempt += 1
+
+        if self.normalize:
+            img_slice -= img_slice.mean()
+            img_slice /= img_slice.std()
+            
+        return img_slice

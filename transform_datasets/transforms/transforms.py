@@ -41,7 +41,71 @@ class UniformNoise(Transform):
         for i, x in enumerate(data):
             for j in range(self.n_samples):
                 noise = np.random.uniform(-self.magnitude, self.magnitude, size=size)
-                xt = x + noise
+                xt = x.numpy().copy() + noise
+                transformed_data.append(xt)
+                transforms.append(self.magnitude)
+                new_labels.append(labels[i])
+                for k in new_tlabels.keys():
+                    new_tlabels[k].append(tlabels[k][i])
+
+        transformed_data, new_labels, new_tlabels, transforms = self.reformat(
+            transformed_data, new_labels, new_tlabels, transforms
+        )
+        return transformed_data, new_labels, new_tlabels, transforms
+    
+    
+class GaussianNoise(Transform):
+    def __init__(self, loc=0.0, scale=1.0, n_samples=10):
+        super().__init__()
+        self.name = "gaussian-noise"
+        self.loc = loc
+        self.scale = scale
+        self.n_samples = n_samples
+
+    def __call__(self, data, labels, tlabels):
+        size = data.shape[1:]
+        transformed_data, new_labels, new_tlabels, transforms = self.define_containers(
+            tlabels
+        )
+        for i, x in enumerate(data):
+            for j in range(self.n_samples):
+                noise = np.random.normal(loc=self.loc, scale=self.scale, size=size)
+                xt = x.numpy().copy() + noise
+                transformed_data.append(xt)
+                transforms.append((self.loc, self.scale))
+                new_labels.append(labels[i])
+                for k in new_tlabels.keys():
+                    new_tlabels[k].append(tlabels[k][i])
+
+        transformed_data, new_labels, new_tlabels, transforms = self.reformat(
+            transformed_data, new_labels, new_tlabels, transforms
+        )
+        return transformed_data, new_labels, new_tlabels, transforms
+    
+    
+class VonMisesNoise(Transform):
+    
+    """
+    Assumes the data it is applied to is complex.
+    """
+    
+    def __init__(self, mu=0.0, kappa=1.0):
+        super().__init__()
+        self.name = "von-mises-noise"
+        self.mu = mu
+        self.kappa = kappa
+        self.n_shifts = n_shifts
+        
+        
+    def __call__(self, data, labels, tlabels):
+        size = data.shape[1:]
+        transformed_data, new_labels, new_tlabels, transforms = self.define_containers(
+            tlabels
+        )
+        for i, x in enumerate(data):
+            for j in range(self.n_samples):
+                noise = np.random.vonmises(mu=self.mu)
+                xt = x * np.exp(1j * noise)
                 transformed_data.append(xt.numpy())
                 transforms.append(self.magnitude)
                 new_labels.append(labels[i])
@@ -52,7 +116,93 @@ class UniformNoise(Transform):
             transformed_data, new_labels, new_tlabels, transforms
         )
         return transformed_data, new_labels, new_tlabels, transforms
+    
+    
+class Fourier1D(Transform):
+    def __init__(self):
+        super().__init__()
+        self.name = "fourier-1d"
 
+    def __call__(self, data, labels, tlabels):
+        transformed_data = torch.fft.fft(data)
+        transforms = torch.zeros(len(transformed_data))
+        new_labels = labels
+        new_tlabels = tlabels
+        return transformed_data, new_labels, new_tlabels, transforms
+    
+class Fourier2D(Transform):
+    def __init__(self):
+        super().__init__()
+        self.name = "fourier-2d"
+
+    def __call__(self, data, labels, tlabels):
+        transformed_data = torch.fft.fft2(data)
+        transforms = torch.zeros(len(transformed_data))
+        new_labels = labels
+        new_tlabels = tlabels
+        return transformed_data, new_labels, new_tlabels, transforms
+    
+    
+class PhaseRotation(Transform):
+    
+    """
+    Assumes the data it is applied to is in complex Fourier space.
+    """
+    
+    def __init__(self, n_transformations):
+        super().__init__()
+        self.name = "phase-rotation"
+        self.n_transformations = n_transformations
+        
+        
+    def __call__(self, data, labels, tlabels):
+        dim = data.shape[-1]
+        transformed_data, new_labels, new_tlabels, transforms = self.define_containers(
+            tlabels
+        )
+
+        frequencies = np.fft.fftfreq(dim, d=1/dim)        
+        shifts = np.arange(0, 2 * np.pi, 2 * np.pi / self.n_transformations)
+        
+        for i, x in enumerate(data):
+            for s in shifts:
+                transformed_data.append(x.numpy() * np.exp(1j * frequencies * s))
+                transforms.append(s)
+                new_labels.append(labels[i])
+                for k in new_tlabels.keys():
+                    new_tlabels[k].append(tlabels[k][i])
+
+        transformed_data, new_labels, new_tlabels, transforms = self.reformat(
+            transformed_data, new_labels, new_tlabels, transforms
+        )
+        return transformed_data, new_labels, new_tlabels, transforms
+
+    
+class UnitNorm(Transform):
+    def __init__(self, axis=-1):
+        super().__init__()
+        self.name = "unit-norm"
+        self.axis = axis
+
+    def __call__(self, data, labels, tlabels):
+        transformed_data = data / (torch.linalg.norm(data, axis=self.axis, keepdims=True) + 1e-10)
+        transforms = torch.zeros(len(transformed_data))
+        new_labels = labels
+        new_tlabels = tlabels
+        return transformed_data, new_labels, new_tlabels, transforms
+    
+class UnitMagnitude(Transform):
+    def __init__(self):
+        super().__init__()
+        self.name = "unit-magnitude"
+
+    def __call__(self, data, labels, tlabels):
+        transformed_data = data / abs(data) #TODO: Maybe add epsilon to avoid div by zero?
+        transforms = torch.zeros(len(transformed_data))
+        new_labels = labels
+        new_tlabels = tlabels
+        return transformed_data, new_labels, new_tlabels, transforms
+    
 
 class CyclicTranslation1D(Transform):
     def __init__(self, fraction_transforms=0.1, sample_method="linspace"):
