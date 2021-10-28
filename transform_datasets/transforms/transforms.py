@@ -6,6 +6,7 @@ from skimage.transform import rotate
 import pyshtools as pysh
 import itertools
 from collections import OrderedDict
+from cplxmodule.cplx import Cplx
 
 
 class Transform:
@@ -89,13 +90,12 @@ class VonMisesNoise(Transform):
     Assumes the data it is applied to is complex.
     """
     
-    def __init__(self, mu=0.0, kappa=1.0):
+    def __init__(self, mu=0.0, kappa=10.0, n_samples=10):
         super().__init__()
         self.name = "von-mises-noise"
         self.mu = mu
         self.kappa = kappa
-        self.n_shifts = n_shifts
-        
+        self.n_samples = n_samples
         
     def __call__(self, data, labels, tlabels):
         size = data.shape[1:]
@@ -104,10 +104,10 @@ class VonMisesNoise(Transform):
         )
         for i, x in enumerate(data):
             for j in range(self.n_samples):
-                noise = np.random.vonmises(mu=self.mu)
+                noise = np.random.vonmises(mu=self.mu, kappa=self.kappa, size=x.shape)
                 xt = x * np.exp(1j * noise)
                 transformed_data.append(xt.numpy())
-                transforms.append(self.magnitude)
+                transforms.append((self.mu, self.kappa))
                 new_labels.append(labels[i])
                 for k in new_tlabels.keys():
                     new_tlabels[k].append(tlabels[k][i])
@@ -129,6 +129,7 @@ class Fourier1D(Transform):
         new_labels = labels
         new_tlabels = tlabels
         return transformed_data, new_labels, new_tlabels, transforms
+    
     
 class Fourier2D(Transform):
     def __init__(self):
@@ -176,7 +177,82 @@ class PhaseRotation(Transform):
             transformed_data, new_labels, new_tlabels, transforms
         )
         return transformed_data, new_labels, new_tlabels, transforms
+    
+    
+class PhaseRotation2D(Transform):
+    
+    """
+    Assumes the data it is applied to is 2D and in complex Fourier space.
+    """
+    
+    def __init__(self, n_transformations):
+        super().__init__()
+        self.name = "phase-rotation"
+        self.n_transformations = n_transformations
+        
+        
+    def __call__(self, data, labels, tlabels):
+        img_size = data.shape[1:]
+        transformed_data, new_labels, new_tlabels, transforms = self.define_containers(
+            tlabels
+        )
 
+#         frequencies_r = np.fft.fftfreq(img_size[0], d=1/img_size[0])
+#         frequencies_c = np.fft.fftfreq(img_size[1], d=1/img_size[1])
+        freqs = np.array(list(itertools.product(np.fft.fftfreq(img_size[0], d=1/img_size[0]), np.fft.fftfreq(img_size[1], d=1/img_size[1])))).reshape(img_size+(2,))
+        shifts_r = np.arange(0, 2 * np.pi, 2 * np.pi / self.n_transformations)
+        shifts_c = np.arange(0, 2 * np.pi, 2 * np.pi / self.n_transformations)
+        shifts = list(itertools.product(shifts_r, shifts_c))
+        
+        for i, x in enumerate(data):
+            for s in shifts:
+                transformed_data.append(x.numpy() * np.exp(1j * (freqs[:, :, 0] * s[0] + freqs[:, :, 1] * s[1])))
+                transforms.append(s)
+                new_labels.append(labels[i])
+                for k in new_tlabels.keys():
+                    new_tlabels[k].append(tlabels[k][i])
+
+        transformed_data, new_labels, new_tlabels, transforms = self.reformat(
+            transformed_data, new_labels, new_tlabels, transforms
+        )
+        return transformed_data, new_labels, new_tlabels, transforms
+    
+    
+class Bispectrum1DLabels(Transform):
+
+    def __init__(self):
+        super().__init__()
+        self.name = "bispectrum-1d-labels"        
+        
+    def __call__(self, data, labels, tlabels):
+        img_size = data.shape[1:]
+        transformed_data, new_labels, new_tlabels, transforms = self.define_containers(
+            tlabels
+        )
+        
+        n = data.shape[-1]
+        
+        FT = torch.fft.fft(data)
+        FT = FT.reshape((FT.shape[0], -1))
+        
+        rolled_real = torch.stack([torch.roll(FT.real, -i, dims=1) for i in range(n)])
+        rolled_imag = torch.stack([torch.roll(FT.imag, -i, dims=1) for i in range(n)])
+      
+        t = rolled_real + 1j * rolled_imag
+        t = t.permute(1, 0, -1)
+        FT = FT.unsqueeze(-1)
+        BS = (FT @ FT.permute(0, -1, 1) * t.conj())
+        BS = BS.reshape(BS.shape[0], -1)
+
+        new_labels = torch.cat([BS.real, BS.imag], axis=-1).float()
+        new_labels -= new_labels.mean(axis=-1, keepdims=True)
+        new_labels /= new_labels.std(axis=-1, keepdims=True)
+        new_tlabels = tlabels
+        transformed_data = data
+        transforms = torch.zeros(len(transformed_data))
+        
+        return transformed_data, new_labels, new_tlabels, transforms
+    
     
 class UnitNorm(Transform):
     def __init__(self, axis=-1):
@@ -394,6 +470,9 @@ class SO3(Transform):
     def __init__(
         self, n_samples=10, grid_type="GLQ", sample_method="linspace"
     ):
+        """
+        TODO: Currently encountering a bug when input is complex
+        """
         super().__init__()
         assert sample_method in [
             "linspace",
@@ -407,9 +486,12 @@ class SO3(Transform):
     def get_samples(self):
         if self.sample_method == "linspace":
             samples_per_axis = int(np.cbrt(self.n_samples))
-            alpha = np.arange(0, 360, 360 / samples_per_axis)
-            beta = np.arange(0, 180, 180 / samples_per_axis)
-            gamma = np.arange(0, 360, 360 / samples_per_axis)
+#             alpha = np.arange(0, 360, 360 / samples_per_axis)
+            alpha = np.arange(0, 360, 360 / self.n_samples)
+            beta = np.arange(0, 1)
+            gamma = np.arange(0, 1)
+#             beta = np.arange(0, 180, 180 / samples_per_axis)
+#             gamma = np.arange(0, 360, 360 / samples_per_axis)
             select_transforms = list(itertools.product(alpha, beta, gamma))
             return select_transforms
 
