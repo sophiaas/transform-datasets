@@ -34,6 +34,9 @@ class PatternDataset:
         y = self.labels[idx]
         return x, y
     
+    def __len__(self):
+        return len(self.data)
+    
 
 class HarmonicsS1(PatternDataset):
     def __init__(
@@ -208,19 +211,76 @@ class RandomNormal(PatternDataset):
 class UniformPhasors(PatternDataset):
     
     def __init__(self,
-                 dim=32,
+                 size=(32,),
                  n_classes=10,
                  name="uniform-phasors"):
         
-        super().__init__(dim=dim, 
+        super().__init__(size=size, 
                          n_classes=n_classes,
                          name=name)
         
         self.gen_dataset()
         
     def gen_pattern(self):
-        phase = np.random.uniform(-np.pi, np.pi, size=self.dim)
+        phase = np.random.uniform(-np.pi, np.pi, size=self.size)
         return np.exp(1j * phase)
+    
+    
+class WhiteNoise1D(PatternDataset):
+    
+    def __init__(self,
+                 dim=32,
+                 n_classes=10,
+                 real=True,
+                 zero_mean=True,
+                 smooth=False,
+                 sigma=None,
+                 name="white-noise-1d"):
+        
+        super().__init__(dim=dim, 
+                         n_classes=n_classes,
+                         name=name,
+                         real=real,
+                         smooth=smooth,
+                         sigma=sigma,
+                         zero_mean=zero_mean)
+        
+        self.gen_dataset()
+        
+    def gaussian_kernel_1d(self):
+        if self.sigma is None:
+            self.sigma = self.dim / 8
+        x = np.linspace(-(self.dim - 1) / 2., (self.dim - 1) / 2., self.dim)
+        kernel = np.exp(-0.5 * (x / self.sigma) ** 2) 
+        return kernel / np.max(kernel)
+        
+    def gen_pattern(self):
+        max_freq = math.floor(self.dim / 2)
+        even = (self.dim % 2) == 0
+        if self.smooth:
+            kernel = self.gaussian_kernel_1d()
+        else:
+            kernel = np.ones(dim)
+        if self.real:   
+            if even:
+                neg = np.random.uniform(-np.pi, np.pi, max_freq)
+                zero = np.random.uniform(-np.pi, np.pi, 1)
+                pos = -(neg[1:][::-1])
+                phase_pattern = np.concatenate([neg, zero, pos])
+            else:
+                neg = np.random.uniform(-np.pi, np.pi, max_freq)
+                zero = np.random.uniform(-np.pi, np.pi, 1)
+                pos = -(neg[::-1])
+                phase_pattern = np.concatenate([neg, zero, pos])
+            f_coeffs = kernel * np.exp(1j * phase_pattern)
+            signal = np.fft.ifft(np.fft.ifftshift(f_coeffs)).real
+        else:
+            phase_pattern = np.random.uniform(-np.pi, np.pi, self.dim)
+            f_coeffs = kernel * np.exp(1j * phase_pattern)
+            signal = np.fft.ifft(np.fft.ifftshift(f_coeffs))
+        if self.zero_mean:
+            signal = signal - np.mean(signal, keepdims=True)
+        return signal
 
 
 class NaturalImageSlices(PatternDataset):
