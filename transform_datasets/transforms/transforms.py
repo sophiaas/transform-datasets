@@ -25,6 +25,65 @@ class Transform:
         for k in new_tlabels.keys():
             new_tlabels[k] = torch.stack(new_tlabels[k])
         return transformed_data, new_labels, new_tlabels, transforms
+    
+    
+class Permutation(Transform):
+    def __init__(self,
+                 percent_transformations=0.1):
+        super().__init__()
+        self.name = "permutation"
+        self.percent_transformations = percent_transformations
+        
+    def __call__(self, data, labels, tlabels):
+        if len(data.shape) != 3:
+            raise ValueError("Data must be (k, n, m)")
+        dim = data.shape[1]
+        all_permutations = np.math.factorial(dim)
+        select_permutations = int(all_permutations * self.percent_transformations)
+        transformed_data = []
+        all_perms = []
+        for mat in data:
+            # Permute matrices
+            for i in range(select_permutations): 
+                # NB: Generates a random permutation each time, may be redundant
+                perm = np.random.permutation(dim)
+                permuted = mat[perm][:, perm]
+                transformed_data.append(permuted) 
+                all_perms.append(perm)
+        transformed_data = torch.stack(transformed_data)
+        return transformed_data, labels, tlabels, all_perms
+    
+class CenterMean(Transform):
+    def __init__(self):
+        super().__init__()
+        self.name = "center-mean"
+        
+    def __call__(self, data, labels, tlabels):
+        if len(data.shape) == 2:
+            axis = -1
+        elif len(data.shape) == 3:
+            axis = (-1, -2)
+        else:
+            raise ValueError("Operation is not defined for data of dimension {}".format(len(data.shape)))
+        means = data.mean(axis=axis, keepdims=True)
+        transformed_data = data - means
+        return transformed_data, labels, tlabels, means
+    
+class UnitStd(Transform):
+    def __init__(self):
+        super().__init__()
+        self.name = "unit-std"
+        
+    def __call__(self, data, labels, tlabels):
+        if len(data.shape) == 2:
+            axis = -1
+        elif len(data.shape) == 3:
+            axis = (-1, -2)
+        else:
+            raise ValueError("Operation is not defined for data of dimension {}".format(len(data.shape)))
+        stds = data.std(axis=axis, keepdims=True)
+        transformed_data = data / stds
+        return transformed_data, labels, tlabels, stds
 
 
 class UniformNoise(Transform):
@@ -220,9 +279,10 @@ class PhaseRotation2D(Transform):
     
 class Bispectrum1DLabels(Transform):
 
-    def __init__(self):
+    def __init__(self, normalize=True):
         super().__init__()
-        self.name = "bispectrum-1d-labels"        
+        self.name = "bispectrum-1d-labels"     
+        self.normalize = normalize
         
     def __call__(self, data, labels, tlabels):
         img_size = data.shape[1:]
@@ -245,8 +305,9 @@ class Bispectrum1DLabels(Transform):
         BS = BS.reshape(BS.shape[0], -1)
 
         new_labels = torch.cat([BS.real, BS.imag], axis=-1).float()
-        new_labels -= new_labels.mean(axis=-1, keepdims=True)
-        new_labels /= new_labels.std(axis=-1, keepdims=True)
+        if self.normalize:
+            new_labels -= new_labels.mean(axis=(0, 1), keepdims=True)
+            new_labels /= new_labels.std(axis=(0, 1), keepdims=True)
         new_tlabels = tlabels
         transformed_data = data
         transforms = torch.zeros(len(transformed_data))
