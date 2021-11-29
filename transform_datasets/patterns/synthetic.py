@@ -5,6 +5,7 @@ from transform_datasets.transforms.functional import translate1d, translate2d
 import pyshtools as pysh
 from PIL import Image
 import os
+import math
 
 
 class PatternDataset:
@@ -36,6 +37,40 @@ class PatternDataset:
     
     def __len__(self):
         return len(self.data)
+    
+
+class BinaryGraphs(PatternDataset):
+    def __init__(
+        self,
+        name="binary_graphs",
+        dim=32,
+        sparsity=0.7,
+        n_classes=10,
+    ):
+
+        super().__init__(
+            name=name,
+            dim=dim,
+            n_classes=n_classes,
+        )
+        self.sparsity = sparsity
+        self.gen_dataset()
+
+    def gen_pattern(self):
+        graph = np.zeros((self.dim, self.dim))
+        for i in range(self.dim):
+            for j in range(i+1, self.dim):
+                x = np.random.uniform(0, 1)
+                if x >= self.sparsity:
+                    graph[i, j] = 1.0
+                    graph[j, i] = 1.0
+#         x = np.random.uniform(0, 1, size=(self.dim, self.dim))
+#         x[x < self.sparsity] = 0.0
+#         x[x >= self.sparsity] = 1.0
+
+#         x -= np.mean(x)
+#         x /= np.std(abs(x))
+        return graph
     
 
 class HarmonicsS1(PatternDataset):
@@ -191,7 +226,9 @@ class RandomUniform(PatternDataset):
         self.gen_dataset()
 
     def gen_pattern(self):
-        return np.random.uniform(-self.magnitude, self.magnitude, size=self.size)
+        pattern = np.random.uniform(-self.magnitude, self.magnitude, size=self.size)
+        pattern -= pattern.mean(keepdims=True)
+        return pattern
 
 
 class RandomNormal(PatternDataset):
@@ -205,7 +242,9 @@ class RandomNormal(PatternDataset):
         self.gen_dataset()
 
     def gen_pattern(self):
-        return np.random.normal(loc=self.mean, scale=self.std, size=self.size)
+        pattern = np.random.normal(loc=self.mean, scale=self.std, size=self.size)
+        pattern -= pattern.mean(keepdims=True)
+        return pattern
     
     
 class UniformPhasors(PatternDataset):
@@ -260,7 +299,7 @@ class WhiteNoise1D(PatternDataset):
         if self.smooth:
             kernel = self.gaussian_kernel_1d()
         else:
-            kernel = np.ones(dim)
+            kernel = np.ones(self.dim)
         if self.real:   
             if even:
                 neg = np.random.uniform(-np.pi, np.pi, max_freq)
@@ -280,6 +319,7 @@ class WhiteNoise1D(PatternDataset):
             signal = np.fft.ifft(np.fft.ifftshift(f_coeffs))
         if self.zero_mean:
             signal = signal - np.mean(signal, keepdims=True)
+            signal = signal / np.std(signal, keepdims=True)
         return signal
 
 
