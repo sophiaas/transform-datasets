@@ -1,12 +1,14 @@
 import numpy as np
 import torch
 from scipy import ndimage
+
 # from transform_datasets.transforms.functional import translate1d, translate2d, rescale
 from skimage.transform import rotate
 import pyshtools as pysh
 import itertools
 from collections import OrderedDict
 from cplxmodule.cplx import Cplx
+import copy
 
 
 class Transform:
@@ -32,28 +34,38 @@ class Transform:
 
 
 class Permutation(Transform):
-    def __init__(self, percent_transformations=0.1):
+    """
+    Has bugs, needs to be fixed
+    """
+
+    def __init__(self, fraction_transforms=0.1):
         super().__init__()
         self.name = "permutation"
-        self.percent_transformations = percent_transformations
+        self.fraction_transforms = fraction_transforms
 
     def __call__(self, data, labels, tlabels):
         if len(data.shape) != 3:
             raise ValueError("Data must be (k, n, m)")
         dim = data.shape[1]
         all_permutations = np.math.factorial(dim)
-        select_permutations = int(all_permutations * self.percent_transformations)
-        transformed_data = []
-        all_perms = []
-        for mat in data:
+        select_permutations = int(all_permutations * self.fraction_transforms)
+        transformed_data, new_labels, new_tlabels, transforms = self.define_containers(
+            tlabels
+        )
+        for i, mat in enumerate(data):
             # Permute matrices
-            for i in range(select_permutations):
+            for j in range(select_permutations):
                 # NB: Generates a random permutation each time, may be redundant
                 perm = np.random.permutation(dim)
                 permuted = mat[perm][:, perm]
                 transformed_data.append(permuted)
-                all_perms.append(perm)
-        transformed_data = torch.stack(transformed_data)
+                transforms.append(perm)
+                new_labels.append(labels[i])
+                for k in new_tlabels.keys():
+                    new_tlabels[k].append(tlabels[k][i])
+        transformed_data, new_labels, new_tlabels, transforms = self.reformat(
+            transformed_data, new_labels, new_tlabels, transforms
+        )
         return transformed_data, labels, tlabels, all_perms
 
 
@@ -162,7 +174,7 @@ class VonMisesNoise(Transform):
     Assumes the data it is applied to is complex.
     """
 
-    def __init__(self, mu=0.0, kappa=10.0, n_samples=10):
+    def __init__(self, mu=0.0, kappa=10.0, n_samples=1):
         super().__init__()
         self.name = "von-mises-noise"
         self.mu = mu
@@ -178,7 +190,7 @@ class VonMisesNoise(Transform):
             for j in range(self.n_samples):
                 noise = np.random.vonmises(mu=self.mu, kappa=self.kappa, size=x.shape)
                 xt = x * np.exp(1j * noise)
-                transformed_data.append(xt.numpy())
+                transformed_data.append(xt)
                 transforms.append((self.mu, self.kappa))
                 new_labels.append(labels[i])
                 for k in new_tlabels.keys():
@@ -210,6 +222,52 @@ class Fourier2D(Transform):
 
     def __call__(self, data, labels, tlabels):
         transformed_data = torch.fft.fft2(data)
+        transforms = torch.zeros(len(transformed_data))
+        new_labels = labels
+        new_tlabels = tlabels
+        return transformed_data, new_labels, new_tlabels, transforms
+
+
+class Phase(Transform):
+    def __init__(self):
+        super().__init__()
+        self.name = "phase"
+
+    def __call__(self, data, labels, tlabels):
+        transformed_data = np.angle(data)
+        transforms = torch.zeros(len(transformed_data))
+        new_labels = labels
+        new_tlabels = tlabels
+        return transformed_data, new_labels, new_tlabels, transforms
+
+
+class Phasor(Transform):
+    def __init__(self):
+        super().__init__()
+        self.name = "phase"
+
+    def __call__(self, data, labels, tlabels):
+        transformed_data = np.exp(1j * np.angle(data))
+        transforms = torch.zeros(len(transformed_data))
+        new_labels = labels
+        new_tlabels = tlabels
+        return transformed_data, new_labels, new_tlabels, transforms
+
+
+class WindowDelete(Transform):
+    def __init__(self, window_size=(10, 10)):
+        super().__init__()
+        self.name = "window-delete"
+        self.window_size = window_size
+
+    def __call__(self, data, labels, tlabels):
+        img_size = data.shape[1:]
+        start_h_idx = int(img_size[1] / 2) - int(self.window_size[1] / 2)
+        start_v_idx = int(img_size[0] / 2) - int(self.window_size[0] / 2)
+        end_h_idx = start_h_idx + self.window_size[1]
+        end_v_idx = start_v_idx + self.window_size[0]
+        transformed_data = copy.deepcopy(data)
+        transformed_data[:, start_v_idx:end_v_idx, start_h_idx:end_h_idx] = 0.0
         transforms = torch.zeros(len(transformed_data))
         new_labels = labels
         new_tlabels = tlabels
@@ -333,8 +391,8 @@ class Bispectrum1DLabels(Transform):
         transforms = torch.zeros(len(transformed_data))
 
         return transformed_data, new_labels, new_tlabels, transforms
-    
-    
+
+
 class CyclicTranslation1DLabels(Transform):
     def __init__(self, translate_by=1):
         super().__init__()
@@ -439,6 +497,7 @@ class CyclicTranslation2D(Transform):
     """
     TODO: Verify this code
     """
+
     def __init__(self, fraction_transforms=0.1, sample_method="linspace"):
         super().__init__()
         assert sample_method in [
@@ -450,7 +509,7 @@ class CyclicTranslation2D(Transform):
         self.name = "cyclic-translation-2d"
 
     def get_samples(self, dim_v, dim_h):
-        n_transforms = int(self.fraction_transforms * dim_v * dim_h)
+        n_transforms = int(self.fraction_transforms * dim_h * dim_v)
         if self.sample_method == "linspace":
             unit_v = dim_v / n_transforms
             unit_h = dim_h / n_transforms
@@ -487,13 +546,14 @@ class CyclicTranslation2D(Transform):
 
         dim_v, dim_h = data.shape[-2:]
         select_transforms = self.get_samples(dim_v, dim_h)
+        #         print(select_transforms)
         for i, x in enumerate(data):
             if self.sample_method == "random" and self.fraction_transforms != 1.0:
                 select_transforms = self.get_samples(dim_v, dim_h)
             for tv, th in select_transforms:
                 xt = torch.roll(x, (tv, th), dims=(-2, -1))
                 transformed_data.append(xt)
-                transforms.append((tv, th))
+                transforms.append((int(tv), int(th)))
                 new_labels.append(labels[i])
                 for k in new_tlabels.keys():
                     new_tlabels[k].append(tlabels[k][i])

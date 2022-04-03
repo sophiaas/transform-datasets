@@ -27,8 +27,8 @@ class PatternDataset:
             x = self.gen_pattern()
             data.append(x)
             labels.append(y)
-        self.data = torch.tensor(data)
-        self.labels = torch.tensor(labels)
+        self.data = torch.tensor(np.array(data))
+        self.labels = torch.tensor(np.array(labels))
 
     def __getitem__(self, idx):
         x = self.data[idx]
