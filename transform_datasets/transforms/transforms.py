@@ -30,7 +30,6 @@ class Transform:
 
 
 class Permutation(Transform):
-<<<<<<< HEAD
     """
     Has bugs, needs to be fixed
     """
@@ -167,14 +166,8 @@ class VonMisesNoise(Transform):
 
     """
     Assumes the data it is applied to is complex.
-    """
-<<<<<<< HEAD
-    
+    """    
     def __init__(self, mu=0.0, kappa=10.0, n_samples=1):
-=======
-
-    def __init__(self, mu=0.0, kappa=10.0, n_samples=10):
->>>>>>> ca1d2b183c64d1e76aacad01e1f5ec0b66149452
         super().__init__()
         self.name = "von-mises-noise"
         self.mu = mu
@@ -225,8 +218,7 @@ class Fourier2D(Transform):
         transforms = torch.zeros(len(transformed_data))
         new_labels = labels
         new_tlabels = tlabels
-        return transformed_data, new_labels, new_tlabels, transforms
-<<<<<<< HEAD
+        return transformed_data, new_labels, new_tlabels, transforms    
     
     
 class Phase(Transform):
@@ -241,6 +233,7 @@ class Phase(Transform):
         new_tlabels = tlabels
         return transformed_data, new_labels, new_tlabels, transforms
     
+    
 class Phasor(Transform):
     def __init__(self):
         super().__init__()
@@ -251,8 +244,7 @@ class Phasor(Transform):
         transforms = torch.zeros(len(transformed_data))
         new_labels = labels
         new_tlabels = tlabels
-        return transformed_data, new_labels, new_tlabels, transforms
-    
+        return transformed_data, new_labels, new_tlabels, transforms 
     
 class WindowDelete(Transform):
     def __init__(self, window_size=(10, 10)):
@@ -273,11 +265,7 @@ class WindowDelete(Transform):
         new_tlabels = tlabels
         return transformed_data, new_labels, new_tlabels, transforms
     
-    
-=======
 
-
->>>>>>> ca1d2b183c64d1e76aacad01e1f5ec0b66149452
 class PhaseRotation(Transform):
 
     """
