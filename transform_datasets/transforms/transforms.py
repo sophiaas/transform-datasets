@@ -22,13 +22,15 @@ class Transform:
     def reformat(self, transformed_data, new_labels, new_tlabels, transforms):
         transformed_data = torch.tensor(transformed_data)
         transforms = torch.tensor(transforms)
-        new_labels = torch.tensor(new_labels)
+        # new_labels = torch.tensor(new_labels)
+        new_labels = torch.stack(new_labels)
         for k in new_tlabels.keys():
             new_tlabels[k] = torch.stack(new_tlabels[k])
         return transformed_data, new_labels, new_tlabels, transforms
-    
-    
+
+
 class Permutation(Transform):
+<<<<<<< HEAD
     """
     Has bugs, needs to be fixed
     """
@@ -59,37 +61,46 @@ class Permutation(Transform):
         transformed_data, new_labels, new_tlabels, transforms = self.reformat(
             transformed_data, new_labels, new_tlabels, transforms
         )
-
         return transformed_data, labels, tlabels, all_perms
-    
+
+
 class CenterMean(Transform):
     def __init__(self):
         super().__init__()
         self.name = "center-mean"
-        
+
     def __call__(self, data, labels, tlabels):
         if len(data.shape) == 2:
             axis = -1
         elif len(data.shape) == 3:
             axis = (-1, -2)
         else:
-            raise ValueError("Operation is not defined for data of dimension {}".format(len(data.shape)))
+            raise ValueError(
+                "Operation is not defined for data of dimension {}".format(
+                    len(data.shape)
+                )
+            )
         means = data.mean(axis=axis, keepdims=True)
         transformed_data = data - means
         return transformed_data, labels, tlabels, means
-    
+
+
 class UnitStd(Transform):
     def __init__(self):
         super().__init__()
         self.name = "unit-std"
-        
+
     def __call__(self, data, labels, tlabels):
         if len(data.shape) == 2:
             axis = -1
         elif len(data.shape) == 3:
             axis = (-1, -2)
         else:
-            raise ValueError("Operation is not defined for data of dimension {}".format(len(data.shape)))
+            raise ValueError(
+                "Operation is not defined for data of dimension {}".format(
+                    len(data.shape)
+                )
+            )
         stds = data.std(axis=axis, keepdims=True)
         transformed_data = data / stds
         return transformed_data, labels, tlabels, stds
@@ -121,8 +132,8 @@ class UniformNoise(Transform):
             transformed_data, new_labels, new_tlabels, transforms
         )
         return transformed_data, new_labels, new_tlabels, transforms
-    
-    
+
+
 class GaussianNoise(Transform):
     def __init__(self, loc=0.0, scale=1.0, n_samples=10):
         super().__init__()
@@ -150,21 +161,26 @@ class GaussianNoise(Transform):
             transformed_data, new_labels, new_tlabels, transforms
         )
         return transformed_data, new_labels, new_tlabels, transforms
-    
-    
+
+
 class VonMisesNoise(Transform):
-    
+
     """
     Assumes the data it is applied to is complex.
     """
+<<<<<<< HEAD
     
     def __init__(self, mu=0.0, kappa=10.0, n_samples=1):
+=======
+
+    def __init__(self, mu=0.0, kappa=10.0, n_samples=10):
+>>>>>>> ca1d2b183c64d1e76aacad01e1f5ec0b66149452
         super().__init__()
         self.name = "von-mises-noise"
         self.mu = mu
         self.kappa = kappa
         self.n_samples = n_samples
-        
+
     def __call__(self, data, labels, tlabels):
         size = data.shape[1:]
         transformed_data, new_labels, new_tlabels, transforms = self.define_containers(
@@ -184,8 +200,8 @@ class VonMisesNoise(Transform):
             transformed_data, new_labels, new_tlabels, transforms
         )
         return transformed_data, new_labels, new_tlabels, transforms
-    
-    
+
+
 class Fourier1D(Transform):
     def __init__(self):
         super().__init__()
@@ -197,8 +213,8 @@ class Fourier1D(Transform):
         new_labels = labels
         new_tlabels = tlabels
         return transformed_data, new_labels, new_tlabels, transforms
-    
-    
+
+
 class Fourier2D(Transform):
     def __init__(self):
         super().__init__()
@@ -210,6 +226,7 @@ class Fourier2D(Transform):
         new_labels = labels
         new_tlabels = tlabels
         return transformed_data, new_labels, new_tlabels, transforms
+<<<<<<< HEAD
     
     
 class Phase(Transform):
@@ -257,27 +274,30 @@ class WindowDelete(Transform):
         return transformed_data, new_labels, new_tlabels, transforms
     
     
+=======
+
+
+>>>>>>> ca1d2b183c64d1e76aacad01e1f5ec0b66149452
 class PhaseRotation(Transform):
-    
+
     """
     Assumes the data it is applied to is in complex Fourier space.
     """
-    
+
     def __init__(self, n_transformations):
         super().__init__()
         self.name = "phase-rotation"
         self.n_transformations = n_transformations
-        
-        
+
     def __call__(self, data, labels, tlabels):
         dim = data.shape[-1]
         transformed_data, new_labels, new_tlabels, transforms = self.define_containers(
             tlabels
         )
 
-        frequencies = np.fft.fftfreq(dim, d=1/dim)        
+        frequencies = np.fft.fftfreq(dim, d=1 / dim)
         shifts = np.arange(0, 2 * np.pi, 2 * np.pi / self.n_transformations)
-        
+
         for i, x in enumerate(data):
             for s in shifts:
                 transformed_data.append(x.numpy() * np.exp(1j * frequencies * s))
@@ -290,36 +310,45 @@ class PhaseRotation(Transform):
             transformed_data, new_labels, new_tlabels, transforms
         )
         return transformed_data, new_labels, new_tlabels, transforms
-    
-    
+
+
 class PhaseRotation2D(Transform):
-    
+
     """
     Assumes the data it is applied to is 2D and in complex Fourier space.
     """
-    
+
     def __init__(self, n_transformations):
         super().__init__()
         self.name = "phase-rotation"
         self.n_transformations = n_transformations
-        
-        
+
     def __call__(self, data, labels, tlabels):
         img_size = data.shape[1:]
         transformed_data, new_labels, new_tlabels, transforms = self.define_containers(
             tlabels
         )
 
-#         frequencies_r = np.fft.fftfreq(img_size[0], d=1/img_size[0])
-#         frequencies_c = np.fft.fftfreq(img_size[1], d=1/img_size[1])
-        freqs = np.array(list(itertools.product(np.fft.fftfreq(img_size[0], d=1/img_size[0]), np.fft.fftfreq(img_size[1], d=1/img_size[1])))).reshape(img_size+(2,))
+        #         frequencies_r = np.fft.fftfreq(img_size[0], d=1/img_size[0])
+        #         frequencies_c = np.fft.fftfreq(img_size[1], d=1/img_size[1])
+        freqs = np.array(
+            list(
+                itertools.product(
+                    np.fft.fftfreq(img_size[0], d=1 / img_size[0]),
+                    np.fft.fftfreq(img_size[1], d=1 / img_size[1]),
+                )
+            )
+        ).reshape(img_size + (2,))
         shifts_r = np.arange(0, 2 * np.pi, 2 * np.pi / self.n_transformations)
         shifts_c = np.arange(0, 2 * np.pi, 2 * np.pi / self.n_transformations)
         shifts = list(itertools.product(shifts_r, shifts_c))
-        
+
         for i, x in enumerate(data):
             for s in shifts:
-                transformed_data.append(x.numpy() * np.exp(1j * (freqs[:, :, 0] * s[0] + freqs[:, :, 1] * s[1])))
+                transformed_data.append(
+                    x.numpy()
+                    * np.exp(1j * (freqs[:, :, 0] * s[0] + freqs[:, :, 1] * s[1]))
+                )
                 transforms.append(s)
                 new_labels.append(labels[i])
                 for k in new_tlabels.keys():
@@ -329,33 +358,32 @@ class PhaseRotation2D(Transform):
             transformed_data, new_labels, new_tlabels, transforms
         )
         return transformed_data, new_labels, new_tlabels, transforms
-    
-    
-class Bispectrum1DLabels(Transform):
 
+
+class Bispectrum1DLabels(Transform):
     def __init__(self, normalize=True):
         super().__init__()
-        self.name = "bispectrum-1d-labels"     
+        self.name = "bispectrum-1d-labels"
         self.normalize = normalize
-        
+
     def __call__(self, data, labels, tlabels):
         img_size = data.shape[1:]
         transformed_data, new_labels, new_tlabels, transforms = self.define_containers(
             tlabels
         )
-        
+
         n = data.shape[-1]
-        
+
         FT = torch.fft.fft(data)
         FT = FT.reshape((FT.shape[0], -1))
-        
+
         rolled_real = torch.stack([torch.roll(FT.real, -i, dims=1) for i in range(n)])
         rolled_imag = torch.stack([torch.roll(FT.imag, -i, dims=1) for i in range(n)])
-      
+
         t = rolled_real + 1j * rolled_imag
         t = t.permute(1, 0, -1)
         FT = FT.unsqueeze(-1)
-        BS = (FT @ FT.permute(0, -1, 1) * t.conj())
+        BS = FT @ FT.permute(0, -1, 1) * t.conj()
         BS = BS.reshape(BS.shape[0], -1)
 
         new_labels = torch.cat([BS.real, BS.imag], axis=-1).float()
@@ -365,10 +393,10 @@ class Bispectrum1DLabels(Transform):
         new_tlabels = tlabels
         transformed_data = data
         transforms = torch.zeros(len(transformed_data))
-        
+
         return transformed_data, new_labels, new_tlabels, transforms
-    
-    
+
+
 class UnitNorm(Transform):
     def __init__(self, axis=-1):
         super().__init__()
@@ -376,24 +404,29 @@ class UnitNorm(Transform):
         self.axis = axis
 
     def __call__(self, data, labels, tlabels):
-        transformed_data = data / (torch.linalg.norm(data, axis=self.axis, keepdims=True) + 1e-10)
+        transformed_data = data / (
+            torch.linalg.norm(data, axis=self.axis, keepdims=True) + 1e-10
+        )
         transforms = torch.zeros(len(transformed_data))
         new_labels = labels
         new_tlabels = tlabels
         return transformed_data, new_labels, new_tlabels, transforms
-    
+
+
 class UnitMagnitude(Transform):
     def __init__(self):
         super().__init__()
         self.name = "unit-magnitude"
 
     def __call__(self, data, labels, tlabels):
-        transformed_data = data / abs(data) #TODO: Maybe add epsilon to avoid div by zero?
+        transformed_data = data / abs(
+            data
+        )  # TODO: Maybe add epsilon to avoid div by zero?
         transforms = torch.zeros(len(transformed_data))
         new_labels = labels
         new_tlabels = tlabels
         return transformed_data, new_labels, new_tlabels, transforms
-    
+
 
 class CyclicTranslation1D(Transform):
     def __init__(self, fraction_transforms=0.1, sample_method="linspace"):
@@ -593,9 +626,7 @@ class SO2(Transform):
 
 
 class SO3(Transform):
-    def __init__(
-        self, n_samples=10, grid_type="GLQ", sample_method="linspace"
-    ):
+    def __init__(self, n_samples=10, grid_type="GLQ", sample_method="linspace"):
         """
         TODO: Currently encountering a bug when input is complex
         """
@@ -612,12 +643,12 @@ class SO3(Transform):
     def get_samples(self):
         if self.sample_method == "linspace":
             samples_per_axis = int(np.cbrt(self.n_samples))
-#             alpha = np.arange(0, 360, 360 / samples_per_axis)
+            #             alpha = np.arange(0, 360, 360 / samples_per_axis)
             alpha = np.arange(0, 360, 360 / self.n_samples)
             beta = np.arange(0, 1)
             gamma = np.arange(0, 1)
-#             beta = np.arange(0, 180, 180 / samples_per_axis)
-#             gamma = np.arange(0, 360, 360 / samples_per_axis)
+            #             beta = np.arange(0, 180, 180 / samples_per_axis)
+            #             gamma = np.arange(0, 360, 360 / samples_per_axis)
             select_transforms = list(itertools.product(alpha, beta, gamma))
             return select_transforms
 
@@ -761,17 +792,17 @@ class CircleCrop(Transform):
 
         return transformed_data, labels, tlabels, transforms
 
-    
+
 class Ravel(Transform):
     def __init__(self):
         super().__init__()
-        self.name = 'ravel'
-        
+        self.name = "ravel"
+
     def __call__(self, data, labels, tlabels):
         transformed_data = data.reshape(data.shape[0], -1)
         transforms = torch.zeros(len(data))
         return transformed_data, labels, tlabels, transforms
-    
+
 
 class HierarchicalReflection:
     def __init__(self):
