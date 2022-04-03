@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 from scipy import ndimage
-from transform_datasets.transforms.functional import translate1d, translate2d, rescale
+# from transform_datasets.transforms.functional import translate1d, translate2d, rescale
 from skimage.transform import rotate
 import pyshtools as pysh
 import itertools
@@ -19,7 +19,10 @@ class Transform:
         return transformed_data, new_labels, new_tlabels, transforms
 
     def reformat(self, transformed_data, new_labels, new_tlabels, transforms):
-        transformed_data = torch.tensor(transformed_data)
+        try:
+            transformed_data = torch.stack(transformed_data)
+        except:
+            transformed_data = torch.tensor(transformed_data)
         transforms = torch.tensor(transforms)
         # new_labels = torch.tensor(new_labels)
         new_labels = torch.stack(new_labels)
@@ -330,6 +333,26 @@ class Bispectrum1DLabels(Transform):
         transforms = torch.zeros(len(transformed_data))
 
         return transformed_data, new_labels, new_tlabels, transforms
+    
+    
+class CyclicTranslation1DLabels(Transform):
+    def __init__(self, translate_by=1):
+        super().__init__()
+        self.name = "cyclic-translation-1d-labels"
+        self.translate_by = translate_by
+
+    def __call__(self, data, labels, tlabels):
+        img_size = data.shape[1:]
+        transformed_data, new_labels, new_tlabels, transforms = self.define_containers(
+            tlabels
+        )
+
+        new_labels = torch.roll(data, self.translate_by, dims=-1)
+        new_tlabels = tlabels
+        transformed_data = data
+        transforms = torch.zeros(len(transformed_data))
+
+        return transformed_data, new_labels, new_tlabels, transforms
 
 
 class UnitNorm(Transform):
@@ -377,7 +400,8 @@ class CyclicTranslation1D(Transform):
     def get_samples(self, dim):
         n_transforms = int(self.fraction_transforms * dim)
         if self.sample_method == "linspace":
-            return [int(x) for x in np.linspace(0, dim - 1, n_transforms)]
+            unit = dim / n_transforms
+            return [int(x) for x in np.arange(0, dim, unit)]
         else:
             select_transforms = np.random.choice(
                 np.arange(dim), size=n_transforms, replace=False
@@ -398,7 +422,7 @@ class CyclicTranslation1D(Transform):
             if self.sample_method == "random" and self.fraction_transforms != 1.0:
                 select_transforms = self.get_samples(dim)
             for t in select_transforms:
-                xt = translate1d(x, t)
+                xt = torch.roll(x, t)
                 transformed_data.append(xt)
                 transforms.append(t)
                 new_labels.append(labels[i])
@@ -412,6 +436,9 @@ class CyclicTranslation1D(Transform):
 
 
 class CyclicTranslation2D(Transform):
+    """
+    TODO: Verify this code
+    """
     def __init__(self, fraction_transforms=0.1, sample_method="linspace"):
         super().__init__()
         assert sample_method in [
@@ -425,11 +452,13 @@ class CyclicTranslation2D(Transform):
     def get_samples(self, dim_v, dim_h):
         n_transforms = int(self.fraction_transforms * dim_v * dim_h)
         if self.sample_method == "linspace":
+            unit_v = dim_v / n_transforms
+            unit_h = dim_h / n_transforms
             return [
                 (int(v), int(h))
                 for v, h in zip(
-                    np.linspace(0, dim_v - 1, n_transforms),
-                    np.linspace(0, dim_h - 1, n_transforms),
+                    np.arange(0, dim_v, unit),
+                    np.arange(0, dim_h, unit),
                 )
             ]
         else:
@@ -462,7 +491,7 @@ class CyclicTranslation2D(Transform):
             if self.sample_method == "random" and self.fraction_transforms != 1.0:
                 select_transforms = self.get_samples(dim_v, dim_h)
             for tv, th in select_transforms:
-                xt = translate2d(x, tv, th)
+                xt = torch.roll(x, (tv, th), dims=(-2, -1))
                 transformed_data.append(xt)
                 transforms.append((tv, th))
                 new_labels.append(labels[i])
