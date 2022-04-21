@@ -494,9 +494,6 @@ class CyclicTranslation1D(Transform):
 
 
 class CyclicTranslation2D(Transform):
-    """
-    TODO: Verify this code
-    """
 
     def __init__(self, fraction_transforms=0.1, sample_method="linspace"):
         super().__init__()
@@ -516,8 +513,8 @@ class CyclicTranslation2D(Transform):
             return [
                 (int(v), int(h))
                 for v, h in zip(
-                    np.arange(0, dim_v, unit),
-                    np.arange(0, dim_h, unit),
+                    np.arange(0, dim_v, unit_v),
+                    np.arange(0, dim_h, unit_h),
                 )
             ]
         else:
@@ -546,7 +543,6 @@ class CyclicTranslation2D(Transform):
 
         dim_v, dim_h = data.shape[-2:]
         select_transforms = self.get_samples(dim_v, dim_h)
-        #         print(select_transforms)
         for i, x in enumerate(data):
             if self.sample_method == "random" and self.fraction_transforms != 1.0:
                 select_transforms = self.get_samples(dim_v, dim_h)
