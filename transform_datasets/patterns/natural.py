@@ -53,7 +53,7 @@ class MNISTExemplars(Dataset):
     Takes the MNIST file path, then loads, standardizes, and saves it internally.
     """
 
-    def __init__(self, path, digits=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]):
+    def __init__(self, path, digits=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], n_exemplars=1):
 
         super().__init__()
 
@@ -61,6 +61,7 @@ class MNISTExemplars(Dataset):
         self.dim = 28 ** 2
         self.img_size = (28, 28)
         self.digits = digits
+        self.n_exemplars = n_exemplars
 
         mnist = np.array(pd.read_csv(path))
 
@@ -74,13 +75,16 @@ class MNISTExemplars(Dataset):
         label_idxs = {i: [j for j, x in enumerate(labels) if x == i] for i in range(10)}
         
         exemplar_data = []
+        labels = []
         for d in digits:
             idxs = label_idxs[d]
-            random_idx = idxs[np.random.randint(len(idxs))]
-            exemplar_data.append(mnist[random_idx])
+            random_idxs = np.random.choice(idxs, size=self.n_exemplars, replace=False)
+            for i in random_idxs:
+                exemplar_data.append(mnist[i])
+                labels.append(d)
             
         self.data = torch.tensor(exemplar_data)
-        self.labels = torch.tensor(digits).long()
+        self.labels = torch.tensor(labels).long()
 
     def __getitem__(self, idx):
         x = self.data[idx]
