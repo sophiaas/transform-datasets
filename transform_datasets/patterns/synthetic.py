@@ -228,6 +228,7 @@ class RandomUniform(PatternDataset):
     def gen_pattern(self):
         pattern = np.random.uniform(-self.magnitude, self.magnitude, size=self.size)
         pattern -= pattern.mean(keepdims=True)
+        pattern /= pattern.std(keepdims=True)
         return pattern
 
 
@@ -244,6 +245,7 @@ class RandomNormal(PatternDataset):
     def gen_pattern(self):
         pattern = np.random.normal(loc=self.mean, scale=self.std, size=self.size)
         pattern -= pattern.mean(keepdims=True)
+        pattern /= pattern.std(keepdims=True)
         return pattern
     
     
