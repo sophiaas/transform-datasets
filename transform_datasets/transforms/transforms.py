@@ -525,7 +525,7 @@ class CyclicTranslation2D(Transform):
                 )
             )
             select_transforms_idx = np.random.choice(
-                range(n_transforms), size=n_transforms, replace=False
+                range(len(all_transforms)), size=n_transforms, replace=False
             )
             select_transforms = [
                 all_transforms[x] for x in sorted(select_transforms_idx)
