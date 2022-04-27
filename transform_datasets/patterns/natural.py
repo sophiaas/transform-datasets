@@ -144,13 +144,11 @@ class NaturalImagePatches(Dataset):
         images=range(98),
         color=False,
         min_contrast=0.2,
-        seed=0,
     ):
 
         super().__init__()
 
         self.name = "natural-img-patches"
-        np.random.seed(seed)
         img_shape = (512, 512)
         self.dim = patch_size ** 2
 
