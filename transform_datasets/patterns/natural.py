@@ -4,7 +4,7 @@ import torch
 from torch.utils.data import Dataset
 import os
 from PIL import Image
-
+import scipy.io
 
 
 class MNIST(Dataset):
@@ -156,7 +156,6 @@ class NaturalImagePatches(Dataset):
 
         data = []
         labels = []
-        translation = []
 
         i = 0
 
@@ -191,6 +190,75 @@ class NaturalImagePatches(Dataset):
 
                 i += 1
 
+        self.data = torch.tensor(np.array(data))
+        self.labels = torch.tensor(np.array(labels))
+        self.patches_per_image = patches_per_image
+
+    def __getitem__(self, idx):
+        x = self.data[idx]
+        y = self.labels[idx]
+        return x, y
+
+    def __len__(self):
+        return len(self.data)
+    
+    
+class VanHateren(Dataset):
+    def __init__(
+        self,
+        patches_per_image=10,
+        patch_size=16,
+        images=range(35),
+        min_contrast=1.0,
+    ):
+
+        super().__init__()
+
+        self.name = "van-hateren"
+        full_img_shape = (512, 512)
+        border = (11, 11)
+        img_shape = (full_img_shape[0] - border[0]*2, full_img_shape[1] - border[1]*2)
+        
+        self.dim = patch_size ** 2
+
+        directory = os.path.expanduser("~/datasets/van-hateren/IMAGES.mat")
+        full_images = scipy.io.loadmat(directory)["IMAGES"][11:501, 11:501]
+        full_images = np.transpose(full_images, (2, 0, 1))
+
+
+        data = []
+        labels = []
+
+        i = 0
+        
+
+        for idx in images:
+            
+            img = full_images[idx]
+
+            for p in range(patches_per_image):
+
+                low_contrast = True
+                j = 0 
+                while low_contrast and j < 100:
+                    start_x = np.random.randint(0, img_shape[1] - patch_size)
+                    start_y = np.random.randint(0, img_shape[0] - patch_size)
+                    patch = img[
+                        start_y : start_y + patch_size, start_x : start_x + patch_size
+                    ]
+                    if patch.std() >= min_contrast:
+                        low_contrast = False
+                    j += 1
+                
+                if j == 100 and not low_contrast:
+                    print("Couldn't find patch to meet contrast requirement. Skipping.")
+                    continue
+                    
+                data.append(patch)
+                labels.append(i)
+
+                i += 1
+                        
         self.data = torch.tensor(np.array(data))
         self.labels = torch.tensor(np.array(labels))
         self.patches_per_image = patches_per_image
