@@ -2,9 +2,8 @@ import numpy as np
 import torch
 from scipy import ndimage
 
-# from transform_datasets.transforms.functional import translate1d, translate2d, rescale
+from transform_datasets.transforms.functional import rescale
 from skimage.transform import rotate
-import pyshtools as pysh
 import itertools
 from collections import OrderedDict
 from cplxmodule.cplx import Cplx
@@ -639,6 +638,8 @@ class SO3(Transform):
         """
         TODO: Currently encountering a bug when input is complex
         """
+        import pyshtools as pysh
+
         super().__init__()
         assert sample_method in [
             "linspace",
