@@ -35,5 +35,5 @@ def rescale(x, scale, img_size):
         scale=scale, translation=(shift, shift)
     )
     return skimage.transform.warp(
-        x, gen_transform(scale=scale, shift=compute_shift(img_size, scale)).inverse
+        x, gen_transform(scale=scale, shift=compute_shift(img_size, scale)).inverse,  mode='edge'
     )
