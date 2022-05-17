@@ -3,6 +3,7 @@ import torch
 from scipy import ndimage
 
 from transform_datasets.transforms.functional import rescale
+from transform_datasets.transforms.groups import Commutative
 from skimage.transform import rotate
 import itertools
 from collections import OrderedDict
@@ -813,6 +814,46 @@ class Ravel(Transform):
         transforms = torch.zeros(len(data))
         return transformed_data, labels, tlabels, transforms
 
+    
+class ProductGroupCommutative(Transform):
+    def __init__(self,
+                 M=[2, 2],
+                 fraction_transforms=1.0,
+                 sample_method="random"):
+        super().__init__()
+        self.group = Commutative(M=M)
+        self.fraction_transforms = fraction_transforms
+        self.sample_method = sample_method
+        
+    def get_samples(self):
+        n_transforms = int(self.fraction_transforms * self.group.n)
+        if self.sample_method == "linspace":
+            unit = self.group.n / n_transforms
+            return [int(x) for x in np.arange(0, self.group.n, unit)]
+        else:
+            select_transforms = np.random.choice(
+                np.arange(self.group.n), size=n_transforms, replace=False
+            )
+            select_transforms = sorted(select_transforms)
+            return select_transforms
+        
+    def __call__(self, data, labels, tlabels):
+        transformed_data, new_labels, new_tlabels, transforms = self.define_containers(
+            tlabels
+        )
+        select_transforms = self.get_samples()
+        for i, x in enumerate(data):
+            for t in select_transforms:
+                g = self.group.element_at_index(t)
+                xt = self.group.act(g, x)
+                transformed_data.append(xt)
+                transforms.append(g)
+                new_labels.append(labels[i])
+
+        transformed_data, new_labels, new_tlabels, transforms = self.reformat(
+            transformed_data, new_labels, new_tlabels, transforms
+        )
+        return transformed_data, new_labels, new_tlabels, transforms
 
 class HierarchicalReflection:
     def __init__(self):
