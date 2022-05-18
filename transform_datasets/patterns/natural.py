@@ -281,7 +281,6 @@ class VanHateren(Dataset):
         select_img_path="select_imgs.txt",
         patches_per_image=10,
         patch_size=16,
-        images=range(35),
         min_contrast=1.0,
     ):
 
@@ -294,27 +293,32 @@ class VanHateren(Dataset):
         self.patches_per_image = patches_per_image
         self.select_img_path = select_img_path
         self.normalize = normalize
-        self.img_shape=(1024, 1536)
+        self.patch_size = patch_size
+        self.min_contrast = min_contrast
+        self.img_shape = (1024, 1536)
         
         full_images = self.load_images()
 
+        self.data, self.labels = self.get_patches(full_images)
+
+        
+    def get_patches(self, full_images):
         data = []
         labels = []
 
         i = 0
         
-        for idx in images:
-            img = full_images[idx]
-            for p in range(patches_per_image):
+        for img in full_images:
+            for p in range(self.patches_per_image):
                 low_contrast = True
                 j = 0 
                 while low_contrast and j < 100:
-                    start_x = np.random.randint(0, self.img_shape[1] - patch_size)
-                    start_y = np.random.randint(0, self.img_shape[0] - patch_size)
+                    start_x = np.random.randint(0, self.img_shape[1] - self.patch_size)
+                    start_y = np.random.randint(0, self.img_shape[0] - self.patch_size)
                     patch = img[
-                        start_y : start_y + patch_size, start_x : start_x + patch_size
+                        start_y : start_y + self.patch_size, start_x : start_x + self.patch_size
                     ]
-                    if patch.std() >= min_contrast:
+                    if patch.std() >= self.min_contrast:
                         low_contrast = False
                         data.append(patch)
                         labels.append(i)
@@ -325,9 +329,10 @@ class VanHateren(Dataset):
                     continue
 
                 i += 1
+        data = torch.tensor(np.array(data))
+        labels = torch.tensor(np.array(labels))
+        return data, labels
                         
-        self.data = torch.tensor(np.array(data))
-        self.labels = torch.tensor(np.array(labels))
         
     def load_images(self):
         if self.select_img_path is not None:
@@ -366,3 +371,62 @@ class VanHateren(Dataset):
 
     def __len__(self):
         return len(self.data)
+    
+    
+    
+class VanHaterenSlices(VanHateren):
+    def __init__(
+        self,
+        path,
+        normalize=True,
+        select_img_path="select_imgs.txt",
+        patches_per_image=10,
+        patch_size=16,
+        min_contrast=1.0,
+    ):
+
+
+        super().__init__(path=path,
+                         normalize=normalize,
+                         select_img_path=select_img_path,
+                         patches_per_image=patches_per_image,
+                         patch_size=patch_size,
+                         min_contrast=min_contrast)
+
+        
+    def get_patches(self, full_images):
+        data = []
+        labels = []
+
+        i = 0
+        
+        for img in full_images:
+            for p in range(self.patches_per_image):
+                low_contrast = True
+                j = 0 
+                while low_contrast and j < 100:
+                    horizontal = np.random.randint(0, 2)
+                    start_x = np.random.randint(0, self.img_shape[1] - self.patch_size)
+                    start_y = np.random.randint(0, self.img_shape[0] - self.patch_size)
+                    if horizontal == 1:
+                        patch = img[
+                            start_y, start_x : start_x + self.patch_size
+                        ]
+                    else:
+                        patch = img[
+                            start_y : start_y + self.patch_size, start_x
+                        ]
+                    if patch.std() >= self.min_contrast:
+                        low_contrast = False
+                        data.append(patch)
+                        labels.append(i)
+                    j += 1
+                
+                if j == 100 and not low_contrast:
+                    print("Couldn't find patch to meet contrast requirement. Skipping.")
+                    continue
+
+                i += 1
+        data = torch.tensor(np.array(data))
+        labels = torch.tensor(np.array(labels))
+        return data, labels
