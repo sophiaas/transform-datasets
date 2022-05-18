@@ -849,7 +849,9 @@ class ProductGroupCommutative(Transform):
                 transformed_data.append(xt)
                 transforms.append(g)
                 new_labels.append(labels[i])
-
+                for k in new_tlabels.keys():
+                    new_tlabels[k].append(tlabels[k][i])
+                
         transformed_data, new_labels, new_tlabels, transforms = self.reformat(
             transformed_data, new_labels, new_tlabels, transforms
         )
