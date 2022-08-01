@@ -4,7 +4,7 @@ from scipy import ndimage
 
 from transform_datasets.transforms.functional import rescale
 from transform_datasets.transforms.groups import Commutative
-from skimage.transform import rotate
+from skimage.transform import rotate, resize
 import itertools
 from collections import OrderedDict
 from cplxmodule.cplx import Cplx
@@ -24,7 +24,7 @@ class Transform:
         try:
             transformed_data = torch.stack(transformed_data)
         except:
-            transformed_data = torch.tensor(transformed_data)
+            transformed_data = torch.tensor(np.array(transformed_data))
         transforms = torch.tensor(transforms)
         # new_labels = torch.tensor(new_labels)
         new_labels = torch.stack(new_labels)
@@ -632,8 +632,34 @@ class SO2(Transform):
             transformed_data, new_labels, new_tlabels, transforms
         )
         return transformed_data, new_labels, new_tlabels, transforms
+    
+    
+class Resize(Transform):
+    
+    def __init__(self, new_size):
+        super().__init__()
+        self.new_size = new_size
+        self.name = "resize"
 
+    def __call__(self, data, labels, tlabels):
+        assert (
+            len(data.shape) == 3
+        ), "Data must have shape (n_datapoints, img_size[0], img_size[1])"
 
+        transformed_data, new_labels, new_tlabels, transforms = self.define_containers(
+            tlabels
+        )
+
+        for i, x in enumerate(data):
+            transformed_data.append(resize(x, self.new_size))
+            
+        transformed_data = torch.tensor(np.array(transformed_data))
+        transforms = torch.tensor([self.new_size] * len(transformed_data))
+
+        return transformed_data, labels, tlabels, transforms
+
+    
+    
 class SO3(Transform):
     def __init__(self, n_samples=10, grid_type="GLQ", sample_method="linspace"):
         """
