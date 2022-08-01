@@ -28,8 +28,8 @@ class MNIST(Dataset):
         labels = mnist[:, 0]
         mnist = mnist[:, 1:]
         mnist = mnist / 255
-        mnist = mnist - mnist.mean(axis=1, keepdims=True)
-        mnist = mnist / mnist.std(axis=1, keepdims=True)
+#         mnist = mnist - mnist.mean(axis=1, keepdims=True)
+#         mnist = mnist / mnist.std(axis=1, keepdims=True)
         mnist = mnist.reshape((len(mnist), 28, 28))
         if ordered:
             sort_idx = np.argsort(labels)
@@ -69,8 +69,8 @@ class MNISTExemplars(Dataset):
         labels = mnist[:, 0]
         mnist = mnist[:, 1:]
         mnist = mnist / 255
-        mnist = mnist - mnist.mean(axis=1, keepdims=True)
-        mnist = mnist / mnist.std(axis=1, keepdims=True)
+#         mnist = mnist - mnist.mean(axis=1, keepdims=True)
+#         mnist = mnist / mnist.std(axis=1, keepdims=True)
         mnist = mnist.reshape((len(mnist), 28, 28))
         
         label_idxs = {i: [j for j, x in enumerate(labels) if x == i] for i in range(10)}
