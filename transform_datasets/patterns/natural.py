@@ -28,8 +28,6 @@ class MNIST(Dataset):
         labels = mnist[:, 0]
         mnist = mnist[:, 1:]
         mnist = mnist / 255
-#         mnist = mnist - mnist.mean(axis=1, keepdims=True)
-#         mnist = mnist / mnist.std(axis=1, keepdims=True)
         mnist = mnist.reshape((len(mnist), 28, 28))
         if ordered:
             sort_idx = np.argsort(labels)
@@ -69,8 +67,6 @@ class MNISTExemplars(Dataset):
         labels = mnist[:, 0]
         mnist = mnist[:, 1:]
         mnist = mnist / 255
-#         mnist = mnist - mnist.mean(axis=1, keepdims=True)
-#         mnist = mnist / mnist.std(axis=1, keepdims=True)
         mnist = mnist.reshape((len(mnist), 28, 28))
         
         label_idxs = {i: [j for j, x in enumerate(labels) if x == i] for i in range(10)}
@@ -100,7 +96,7 @@ class Omniglot(Dataset):
     def __init__(
         self,
         path,
-        ravel=True,
+        ravel=False,
     ):
 
         super().__init__()
@@ -115,12 +111,10 @@ class Omniglot(Dataset):
 
         self.dim = 900
         self.img_size = (30, 30)
-        imgs -= imgs.mean(axis=(1, 2), keepdims=True)
-        imgs /= imgs.std(axis=(1, 2), keepdims=True)
 
         if not ravel:
-            self.channels = 1
-            imgs = imgs.reshape((imgs.shape[0], 1, 30, 30))
+#             self.channels = 1
+            imgs = imgs.reshape((imgs.shape[0], 30, 30))
         else:
             imgs = imgs.reshape((imgs.shape[0], -1))
             
