@@ -60,6 +60,7 @@ class Commutative(Group):
         for i, g in enumerate(cproduct(*[range(a) for a in self.M])):
             for j, h in enumerate(cproduct(*[range(b) for b in self.M])):
                 CT[i, j] = self.index_of_element(self.multiply(g, h))
+        CT = CT.astype('int')
         return CT
 
     def act(self, g, x):
