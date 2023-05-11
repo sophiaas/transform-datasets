@@ -70,44 +70,56 @@ class Permutation(Transform):
 
 
 class CenterMean(Transform):
-    def __init__(self):
+    def __init__(self, samplewise=True):
         super().__init__()
         self.name = "center-mean"
+        self.samplewise = samplewise
 
     def __call__(self, data, labels, tlabels):
-        if len(data.shape) == 2:
-            axis = -1
-        elif len(data.shape) == 3:
-            axis = (-1, -2)
-        else:
-            raise ValueError(
-                "Operation is not defined for data of dimension {}".format(
-                    len(data.shape)
-                )
+        if self.samplewise:
+            if len(data.shape) == 2:
+                axis = -1
+            elif len(data.shape) == 3:
+                axis = (-1, -2)
+            else:
+                raise ValueError(
+                    "Operation is not defined for data of dimension {}".format(
+                        len(data.shape)
+                    )
             )
-        means = data.mean(axis=axis, keepdims=True)
+            means = data.mean(dim=axis, keepdim=True)
+        else:
+            means = data.mean()
         transformed_data = data - means
+        if not self.samplewise:
+            means = torch.tile(means, (len(data),))
         return transformed_data, labels, tlabels, means
 
 
 class UnitStd(Transform):
-    def __init__(self):
+    def __init__(self, samplewise=True):
         super().__init__()
         self.name = "unit-std"
+        self.samplewise = samplewise
 
     def __call__(self, data, labels, tlabels):
-        if len(data.shape) == 2:
-            axis = -1
-        elif len(data.shape) == 3:
-            axis = (-1, -2)
-        else:
-            raise ValueError(
-                "Operation is not defined for data of dimension {}".format(
-                    len(data.shape)
+        if self.samplewise:
+            if len(data.shape) == 2:
+                axis = -1
+            elif len(data.shape) == 3:
+                axis = (-1, -2)
+            else:
+                raise ValueError(
+                    "Operation is not defined for data of dimension {}".format(
+                        len(data.shape)
+                    )
                 )
-            )
-        stds = data.std(axis=axis, keepdims=True)
-        transformed_data = data / stds
+            stds = data.std(dim=axis, keepdim=True)
+        else:
+            stds = data.std()
+        transformed_data = data / (stds + 1e-10)
+        if not self.samplewise:
+            stds = torch.tile(stds, (len(data),))
         return transformed_data, labels, tlabels, stds
 
 
@@ -634,6 +646,71 @@ class SO2(Transform):
         return transformed_data, new_labels, new_tlabels, transforms
     
     
+class O2(Transform):
+    def __init__(self, fraction_transforms=0.1, sample_method="linspace"):
+        """
+        If sample_method == "linspace", rotations will be linspaced. However, flips will be randomized.
+        """
+        super().__init__()
+        assert sample_method in [
+            "linspace",
+            "random",
+        ], "sample_method must be one of ['linspace', 'random']"
+        self.fraction_transforms = fraction_transforms
+        self.sample_method = sample_method
+        self.name = "so2"
+
+    def get_rotations(self):
+        n_transforms = int(self.fraction_transforms * 360)
+        if self.sample_method == "linspace":
+            return np.linspace(0, 359, n_transforms)
+        else:
+            select_transforms = np.random.choice(
+                np.arange(360), size=n_transforms, replace=False
+            )
+            select_transforms = sorted(select_transforms)
+            return select_transforms
+        
+    def get_flips(self):
+        n_transforms = int(self.fraction_transforms * 360)
+        flip_lr = np.random.randint(low=0, high=2, size=(n_transforms,))
+        flip_ud = np.random.randint(low=0, high=2, size=(n_transforms,))
+        flips = np.vstack([flip_lr, flip_ud]).T
+        return flips
+
+    def __call__(self, data, labels, tlabels):
+        assert (
+            len(data.shape) == 3
+        ), "Data must have shape (n_datapoints, img_size[0], img_size[1])"
+
+        transformed_data, new_labels, new_tlabels, transforms = self.define_containers(
+            tlabels
+        )
+
+        rotations = self.get_rotations()
+        flips = self.get_flips()
+        for i, x in enumerate(data):
+            if self.sample_method == "random":
+                rotations = self.get_rotations()
+            for j, t in enumerate(rotations):
+                xt = rotate(x, t)
+                if bool(flips[j][0]):
+                    xt = np.flip(xt, 0)
+                if bool(flips[j][1]):
+                    xt = np.flip(xt, 1)
+                transformed_data.append(xt)
+                transforms.append(t)
+                new_labels.append(labels[i])
+                for k in new_tlabels.keys():
+                    new_tlabels[k].append(tlabels[k][i])
+
+        transformed_data, new_labels, new_tlabels, transforms = self.reformat(
+            transformed_data, new_labels, new_tlabels, transforms
+        )
+        return transformed_data, new_labels, new_tlabels, transforms
+    
+    
+    
 class Resize(Transform):
     
     def __init__(self, new_size):
@@ -839,7 +916,17 @@ class Ravel(Transform):
         transformed_data = data.reshape(data.shape[0], -1)
         transforms = torch.zeros(len(data))
         return transformed_data, labels, tlabels, transforms
+    
+class AddChannelDim(Transform):
+    def __init__(self):
+        super().__init__()
+        self.name = "add-channel-dim"
 
+    def __call__(self, data, labels, tlabels):
+        transformed_data = torch.unsqueeze(data, 1)
+        transforms = torch.zeros(len(data))
+        return transformed_data, labels, tlabels, transforms
+    
     
 class ProductGroupCommutative(Transform):
     def __init__(self,
