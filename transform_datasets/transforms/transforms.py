@@ -672,55 +672,6 @@ class O2(Transform):
             flips = np.random.randint(low=0, high=2, size=(self.n,))
         return rotations, flips
 
-#     def get_rotations(self):
-#         n_transforms = int(self.fraction_transforms * 360)
-#         if self.sample_method == "linspace":
-#             return np.linspace(0, 359, n_transforms)
-#         else:
-#             select_transforms = np.random.choice(
-#                 np.arange(360), size=n_transforms, replace=False
-#             )
-#             select_transforms = sorted(select_transforms)
-#             return select_transforms
-        
-#     def get_flips(self):
-#         n_transforms = int(self.fraction_transforms * 360)
-#         flip_lr = np.random.randint(low=0, high=2, size=(n_transforms,))
-#         flip_ud = np.random.randint(low=0, high=2, size=(n_transforms,))
-#         flips = np.vstack([flip_lr, flip_ud]).T
-#         return flips
-
-#     def __call__(self, data, labels, tlabels):
-#         assert (
-#             len(data.shape) == 3
-#         ), "Data must have shape (n_datapoints, img_size[0], img_size[1])"
-
-#         transformed_data, new_labels, new_tlabels, transforms = self.define_containers(
-#             tlabels
-#         )
-
-#         rotations = self.get_rotations()
-#         flips = self.get_flips()
-#         for i, x in enumerate(data):
-#             if self.sample_method == "random":
-#                 rotations = self.get_rotations()
-#             for j, t in enumerate(rotations):
-#                 xt = rotate(x, t)
-#                 if bool(flips[j][0]):
-#                     xt = np.flip(xt, 0)
-#                 if bool(flips[j][1]):
-#                     xt = np.flip(xt, 1)
-#                 transformed_data.append(xt)
-#                 transforms.append(t)
-#                 new_labels.append(labels[i])
-#                 for k in new_tlabels.keys():
-#                     new_tlabels[k].append(tlabels[k][i])
-
-#         transformed_data, new_labels, new_tlabels, transforms = self.reformat(
-#             transformed_data, new_labels, new_tlabels, transforms
-#         )
-#         return transformed_data, new_labels, new_tlabels, transforms
-
     def get_flips(self):
         if self.sample_method == "linspace":
             n_transforms = int(self.fraction_transforms * 360)
@@ -751,23 +702,6 @@ class O2(Transform):
                 new_labels.append(labels[i])
                 for k in new_tlabels.keys():
                     new_tlabels[k].append(tlabels[k][i])
-
-
-#         rotations = self.get_rotations()
-# #         flips = self.get_flips()
-#         for i, x in enumerate(data):
-#             for b in range(2):
-#                 if b == 0:
-#                     x_flip = x
-#                 else:
-#                     x_flip = torch.flip(x, dims=(0,))
-#                 for j, t in enumerate(rotations):
-#                     xt = rotate(x_flip, t)
-#                     transformed_data.append(xt)
-#                     transforms.append((b, t))
-#                     new_labels.append(labels[i])
-#                     for k in new_tlabels.keys():
-#                         new_tlabels[k].append(tlabels[k][i])
 
         transformed_data, new_labels, new_tlabels, transforms = self.reformat(
             transformed_data, new_labels, new_tlabels, transforms
