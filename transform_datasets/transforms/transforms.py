@@ -598,26 +598,25 @@ class GaussianBlur(Transform):
 
 
 class SO2(Transform):
-    def __init__(self, fraction_transforms=0.1, sample_method="linspace"):
+    def __init__(self, n=1, sample_method="linspace"):
         super().__init__()
         assert sample_method in [
             "linspace",
             "random",
         ], "sample_method must be one of ['linspace', 'random']"
-        self.fraction_transforms = fraction_transforms
+        self.n = n
         self.sample_method = sample_method
         self.name = "so2"
 
     def get_samples(self):
-        n_transforms = int(self.fraction_transforms * 360)
+        rot = 360 / self.n
         if self.sample_method == "linspace":
-            return np.linspace(0, 359, n_transforms)
+            rotations = np.array([rot * i for i in range(self.n)])
         else:
-            select_transforms = np.random.choice(
-                np.arange(360), size=n_transforms, replace=False
+            rotations = np.random.choice(
+                np.arange(360), size=self.n, replace=False
             )
-            select_transforms = sorted(select_transforms)
-            return select_transforms
+        return rotations
 
     def __call__(self, data, labels, tlabels):
         assert (
@@ -647,7 +646,7 @@ class SO2(Transform):
     
     
 class O2(Transform):
-    def __init__(self, fraction_transforms=0.1, sample_method="linspace"):
+    def __init__(self, n=1, sample_method="linspace"):
         """
         If sample_method == "linspace", rotations will be linspaced. However, flips will be randomized.
         """
@@ -656,26 +655,78 @@ class O2(Transform):
             "linspace",
             "random",
         ], "sample_method must be one of ['linspace', 'random']"
-        self.fraction_transforms = fraction_transforms
+        self.n = n
         self.sample_method = sample_method
         self.name = "so2"
-
-    def get_rotations(self):
-        n_transforms = int(self.fraction_transforms * 360)
-        if self.sample_method == "linspace":
-            return np.linspace(0, 359, n_transforms)
-        else:
-            select_transforms = np.random.choice(
-                np.arange(360), size=n_transforms, replace=False
-            )
-            select_transforms = sorted(select_transforms)
-            return select_transforms
         
+    def get_transforms(self):
+        rot = 360 / self.n
+        if self.sample_method == "linspace":
+            rot_list = np.array([rot * i for i in range(self.n)])
+            rotations = np.hstack([rot_list, rot_list])
+            flips = np.hstack([np.zeros(self.n), np.ones(self.n)])
+        else:
+            rotations = np.random.choice(
+                np.arange(360), size=self.n, replace=False
+            )
+            flips = np.random.randint(low=0, high=2, size=(self.n,))
+        return rotations, flips
+
+#     def get_rotations(self):
+#         n_transforms = int(self.fraction_transforms * 360)
+#         if self.sample_method == "linspace":
+#             return np.linspace(0, 359, n_transforms)
+#         else:
+#             select_transforms = np.random.choice(
+#                 np.arange(360), size=n_transforms, replace=False
+#             )
+#             select_transforms = sorted(select_transforms)
+#             return select_transforms
+        
+#     def get_flips(self):
+#         n_transforms = int(self.fraction_transforms * 360)
+#         flip_lr = np.random.randint(low=0, high=2, size=(n_transforms,))
+#         flip_ud = np.random.randint(low=0, high=2, size=(n_transforms,))
+#         flips = np.vstack([flip_lr, flip_ud]).T
+#         return flips
+
+#     def __call__(self, data, labels, tlabels):
+#         assert (
+#             len(data.shape) == 3
+#         ), "Data must have shape (n_datapoints, img_size[0], img_size[1])"
+
+#         transformed_data, new_labels, new_tlabels, transforms = self.define_containers(
+#             tlabels
+#         )
+
+#         rotations = self.get_rotations()
+#         flips = self.get_flips()
+#         for i, x in enumerate(data):
+#             if self.sample_method == "random":
+#                 rotations = self.get_rotations()
+#             for j, t in enumerate(rotations):
+#                 xt = rotate(x, t)
+#                 if bool(flips[j][0]):
+#                     xt = np.flip(xt, 0)
+#                 if bool(flips[j][1]):
+#                     xt = np.flip(xt, 1)
+#                 transformed_data.append(xt)
+#                 transforms.append(t)
+#                 new_labels.append(labels[i])
+#                 for k in new_tlabels.keys():
+#                     new_tlabels[k].append(tlabels[k][i])
+
+#         transformed_data, new_labels, new_tlabels, transforms = self.reformat(
+#             transformed_data, new_labels, new_tlabels, transforms
+#         )
+#         return transformed_data, new_labels, new_tlabels, transforms
+
     def get_flips(self):
-        n_transforms = int(self.fraction_transforms * 360)
-        flip_lr = np.random.randint(low=0, high=2, size=(n_transforms,))
-        flip_ud = np.random.randint(low=0, high=2, size=(n_transforms,))
-        flips = np.vstack([flip_lr, flip_ud]).T
+        if self.sample_method == "linspace":
+            n_transforms = int(self.fraction_transforms * 360)
+            flips = np.hstack([np.zeros(n_transforms), np.ones(n_transforms)])
+        else:
+            flips = np.random.randint(low=0, high=2, size=(n_transforms,))
         return flips
 
     def __call__(self, data, labels, tlabels):
@@ -686,23 +737,37 @@ class O2(Transform):
         transformed_data, new_labels, new_tlabels, transforms = self.define_containers(
             tlabels
         )
-
-        rotations = self.get_rotations()
-        flips = self.get_flips()
+        
+        rotations, flips = self.get_transforms()
         for i, x in enumerate(data):
-            if self.sample_method == "random":
-                rotations = self.get_rotations()
-            for j, t in enumerate(rotations):
-                xt = rotate(x, t)
-                if bool(flips[j][0]):
-                    xt = np.flip(xt, 0)
-                if bool(flips[j][1]):
-                    xt = np.flip(xt, 1)
+            for j in range(len(rotations)):
+                if bool(flips[j]):
+                    x_flip = torch.flip(x, dims=(0,))
+                else:
+                    x_flip = x
+                xt = rotate(x_flip, rotations[j])
                 transformed_data.append(xt)
-                transforms.append(t)
+                transforms.append((flips[j], rotations[j]))
                 new_labels.append(labels[i])
                 for k in new_tlabels.keys():
                     new_tlabels[k].append(tlabels[k][i])
+
+
+#         rotations = self.get_rotations()
+# #         flips = self.get_flips()
+#         for i, x in enumerate(data):
+#             for b in range(2):
+#                 if b == 0:
+#                     x_flip = x
+#                 else:
+#                     x_flip = torch.flip(x, dims=(0,))
+#                 for j, t in enumerate(rotations):
+#                     xt = rotate(x_flip, t)
+#                     transformed_data.append(xt)
+#                     transforms.append((b, t))
+#                     new_labels.append(labels[i])
+#                     for k in new_tlabels.keys():
+#                         new_tlabels[k].append(tlabels[k][i])
 
         transformed_data, new_labels, new_tlabels, transforms = self.reformat(
             transformed_data, new_labels, new_tlabels, transforms
