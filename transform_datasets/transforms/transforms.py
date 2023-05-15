@@ -980,8 +980,10 @@ class HierarchicalReflection:
 class OctahedralRotation(Transform):
     
     def __init__(self,
+                 chiral=True,
                  sample_method="random"):
         super().__init__()
+        self.chiral = chiral
         self.sample_method = sample_method
         
     def all_rotations(self, polycube):
@@ -1038,7 +1040,13 @@ class OctahedralRotation(Transform):
         
         for i, x in enumerate(data):
             if self.sample_method == "random":
-                xt = self.random_rotation(x)
+                if not self.chiral:
+                    flip = np.random.randint(2)
+                if bool(flip):
+                    xt = torch.flip(x, (0,))
+                else:
+                    xt = x
+                xt = self.random_rotation(xt)
                 transformed_data.append(xt)
                 transforms.append(0) #TODO: Return actual transform
                 new_labels.append(labels[i])
@@ -1046,6 +1054,9 @@ class OctahedralRotation(Transform):
                     new_tlabels[k].append(tlabels[k][i])
             else:
                 rots = self.all_rotations(x)
+                if not self.chiral:
+                    rots_flip = self.all_rotations(torch.flip(x, (0,)))
+                    rots = list(rots) + list(rots_flip)
                 for xt in rots:
                     transformed_data.append(xt)
                     transforms.append(0) #TODO: Return actual transform
