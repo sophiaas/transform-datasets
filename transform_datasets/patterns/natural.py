@@ -433,14 +433,14 @@ class ModelNet10Voxel(Dataset):
         self,
         path=os.path.expanduser("~/datasets/ModelNet10Voxel/"),
         test=False,
-#         grid_size=(20, 20, 20),
+        grid_size=(20, 20, 20),
     ):
         
         
         super().__init__()
         self.path = path
         self.test = test
-        self.grid_size = (20, 20, 20)
+        self.grid_size = grid_size
         
         self.data, self.labels, self.target_names = self.load_data()
         
