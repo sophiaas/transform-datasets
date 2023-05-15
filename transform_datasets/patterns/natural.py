@@ -424,3 +424,62 @@ class VanHaterenSlices(VanHateren):
         data = torch.tensor(np.array(data))
         labels = torch.tensor(np.array(labels))
         return data, labels
+    
+    
+    
+class ModelNet10Voxel(Dataset):
+        
+    def __init__(
+        self,
+        path=os.path.expanduser("~/datasets/ModelNet10Voxel/"),
+        test=False,
+#         grid_size=(20, 20, 20),
+    ):
+        
+        
+        super().__init__()
+        self.path = path
+        self.test = test
+        self.grid_size = (20, 20, 20)
+        
+        self.data, self.labels, self.target_names = self.load_data()
+        
+    def _train_test_split_paths(self, dp, sub_path):
+        path = os.path.join(dp, sub_path)
+        file_paths = [os.path.join(path, i)
+                      for i in os.listdir(path)]
+        binvox_paths = list(filter(lambda x: '.binvox' in x, file_paths))
+        return binvox_paths
+    
+    def _read_file(self, fp):
+        from transform_datasets.utils.voxels import read_as_3d_array
+        with open(fp, 'rb') as f:
+            return read_as_3d_array(f).data
+
+    def load_data(self):        
+        dp = self.path
+        dims = self.grid_size
+        label_dirs = list(os.scandir(dp))
+        label_dirs = [i for i in os.scandir(dp) if os.path.isdir(i)]
+        target_names = [i.name for i in label_dirs]
+        if self.test:
+            subpath = "test"
+        else:
+            subpath = "train"
+
+        paths, labels = [], []
+        for i, dir_path in enumerate(label_dirs):
+            for path in self._train_test_split_paths(dir_path.path, subpath):
+                paths.append(path)
+                labels.append(i)
+
+        # converting binvox to numpy and reshape
+        data = [self._read_file(i) for i in paths]
+        data = np.array(data).reshape(-1, dims[0], dims[1], dims[2], 1)
+        labels = np.array(labels)
+        data = torch.tensor(data, dtype=torch.float32).squeeze()
+        labels = torch.tensor(labels)
+        return data, labels, target_names
+
+
+

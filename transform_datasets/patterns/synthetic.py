@@ -387,3 +387,40 @@ class NaturalImageSlices(PatternDataset):
             img_slice /= img_slice.std()
             
         return img_slice
+    
+    
+class Tetris(Dataset):
+
+    def __init__(self):
+        super().__init__()
+        self.name = "tetris"
+
+        block_coords = [
+            [(0, 0, 0), (0, 0, 1), (1, 0, 0), (1, 1, 0)],  # chiral_shape_1
+            [(0, 0, 1), (1, 0, 1), (0, 1, 1), (1, 1, 1)],  # square
+            [(0, 0, 0), (0, 0, 1), (0, 1, 0), (1, 0, 0)],  # corner
+            [(1, 0, 0), (1, 0, 1), (1, 0, 2), (1, 1, 0)],  # L
+            [(1, 0, 0), (1, 0, 1), (1, 0, 2), (1, 1, 1)],  # T
+            [(0, 0, 1), (1, 0, 1), (1, 1, 1), (2, 1, 1)],  # zigzag
+        ]
+
+        data = []
+        for block in block_coords:
+            empty = np.zeros((3, 3, 3), dtype=np.float32)
+            for coords in block:
+                empty[coords[0], coords[1], coords[2]] = 1
+            data.append(empty)
+        data = np.array(data)
+        labels = np.arange(6)
+
+        self.data = torch.tensor(data)
+        self.labels = torch.tensor(labels).long()
+
+    def __getitem__(self, idx):
+        x = self.data[idx]
+        y = self.labels[idx]
+        return x, y
+
+    def __len__(self):
+        return len(self.data)
+    
