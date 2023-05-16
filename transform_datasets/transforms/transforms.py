@@ -674,7 +674,7 @@ class O2(Transform):
 
     def get_flips(self):
         if self.sample_method == "linspace":
-            n_transforms = int(self.fraction_transforms * 360)
+            n_transforms = int(self.n)
             flips = np.hstack([np.zeros(n_transforms), np.ones(n_transforms)])
         else:
             flips = np.random.randint(low=0, high=2, size=(n_transforms,))
@@ -689,8 +689,8 @@ class O2(Transform):
             tlabels
         )
         
-        rotations, flips = self.get_transforms()
         for i, x in enumerate(data):
+            rotations, flips = self.get_transforms()
             for j in range(len(rotations)):
                 if bool(flips[j]):
                     x_flip = torch.flip(x, dims=(0,))
@@ -1040,12 +1040,11 @@ class OctahedralRotation(Transform):
         
         for i, x in enumerate(data):
             if self.sample_method == "random":
+                xt = x
                 if self.full:
                     flip = np.random.randint(2)
-                if bool(flip):
-                    xt = torch.flip(x, (0,))
-                else:
-                    xt = x
+                    if bool(flip):
+                        xt = torch.flip(xt, (0,))
                 xt = self.random_rotation(xt)
                 transformed_data.append(xt)
                 transforms.append(0) #TODO: Return actual transform
