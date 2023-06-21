@@ -37,3 +37,19 @@ def rescale(x, scale, img_size):
     return skimage.transform.warp(
         x, gen_transform(scale=scale, shift=compute_shift(img_size, scale)).inverse,  mode='edge'
     )
+
+def circle_crop(data):
+    """
+    assumes input is batch x height x width
+    """
+    img_size = (data.shape[-2], data.shape[-1])
+
+    v, h = np.mgrid[: img_size[0], : img_size[1]]
+    equation = (v - ((img_size[0] - 1) / 2)) ** 2 + (
+        h - ((img_size[1] - 1) / 2)
+    ) ** 2
+    circle = equation < (equation.max() / 2)
+
+    transformed_data = data.clone()
+    transformed_data[:, ~circle] = 0.0
+    return transformed_data
