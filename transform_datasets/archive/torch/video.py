@@ -6,6 +6,7 @@ from skimage.transform import EuclideanTransform
 import numpy as np
 from harmonics.spectral.wavelets import gen_gabor_basis
 from PIL import Image
+import os
 
 
 class TranslationMotionGabors(Dataset):
@@ -289,11 +290,12 @@ class NaturalTranslatingPatches(Dataset):
                  patch_size=16,
                  n_frames=10,
                  images=range(98),
+                 min_translation=5,
                  max_translation=10,
                  color=False,
-                 normalize_imgs=True,
-                 normalize_vids=True,
-                 min_contrast=0.2,
+#                  normalize_imgs=True,
+#                  normalize_vids=True,
+                 min_contrast=10,
                  seed=0):
        
         self.name = 'natural-images-translating-patches'
@@ -315,30 +317,34 @@ class NaturalTranslatingPatches(Dataset):
             str_idx = "0" * n_zeros + str(idx)
             img = np.asarray(Image.open(directory+"{}.png".format(str_idx)))
             
-            if not color:
+            if not color and img.shape[-1] == 3:
                 img = img.mean(axis=-1)
                 
-            if normalize_imgs:
-                img -= img.mean()
-                img /= img.std()
+#             if normalize_imgs:
+#                 img -= img.mean()
+#                 img /= img.std()
                 
             for p in range(patches_per_image):
                 
                 low_contrast = True
+                k = 0
                 while low_contrast:
                     start_x = np.random.randint(0, img_shape[1] - patch_size)
                     start_y = np.random.randint(0, img_shape[0] - patch_size)
-                    start_patch = img[start_y:start_y+patch_size, start_x:start_x+patch_size]                
-
+                    start_patch = img[start_y:start_y+patch_size, start_x:start_x+patch_size]           
+                        
 
                     x_lower_bound = max(0, start_x - max_translation)
                     y_lower_bound = max(0, start_y - max_translation)
 
                     x_upper_bound = min(start_x + max_translation, img_shape[1] - patch_size)
                     y_upper_bound = min(start_y + max_translation, img_shape[0] - patch_size)
-
-                    end_x = np.random.randint(x_lower_bound, x_upper_bound)
-                    end_y = np.random.randint(y_lower_bound, y_upper_bound)
+                    
+                    translation_length = 0.0
+                    while translation_length < min_translation:
+                        end_x = np.random.randint(x_lower_bound, x_upper_bound)
+                        end_y = np.random.randint(y_lower_bound, y_upper_bound)
+                        translation_length = abs((start_x - end_x) / ((start_y - end_y) + 1e-10))
 
                     x_trajectory = np.linspace(start_x, end_x, n_frames)
                     y_trajectory = np.linspace(start_y, end_y, n_frames)
@@ -360,11 +366,15 @@ class NaturalTranslatingPatches(Dataset):
                     if np.mean(stds) >= min_contrast:
                         low_contrast = False
                         
-                if normalize_vids:
-                    frames = [x - np.mean(frames) for x in frames]
-                    frames = [x / np.std(frames) for x in frames]
+                    k += 1
+                        
+                    if k == 100 and not low_contrast:
+                        print("Couldn't find patch to meet contrast requirement. Skipping.")
+                        continue
                     
-                vid = np.array(frames)
+                vid = np.array(frames, dtype=np.float)
+                vid -= vid.mean(keepdims=True)
+                vid /= (vid.std(keepdims=True) + 1e-10)
                 data.append(vid)
                 translation.append([(start_x, start_y), (end_x, end_y)])
                 exemplar_labels.append(i)
