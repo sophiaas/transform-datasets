@@ -8,6 +8,88 @@ import scipy.io
 import os
 
 
+class VanHaterenVidPatchesDT(Dataset):
+    
+    def __init__(self, dt=1, patch_size=(11, 11), n_patches=5000):
+        size = 128
+        self.dt = dt
+        self.patch_size = patch_size
+        self.n_patches = n_patches
+        
+        # res
+        data_type = np.uint8
+        nelements = size * size * 9600
+        with open("/home/sanborn/datasets/van-hateren-video/vid075", 'rb') as fid:
+            data_array = np.fromfile(fid, data_type, nelements)
+            
+        data_array = data_array.reshape((-1, size, size))
+        data_array = data_array[::2]
+        data_array = data_array[1250:, 15:]
+        data_array = data_array - data_array.min()
+        data_array = data_array / (data_array.max() + 1e-10)
+        self.size = (128 - 15, 128)
+        
+        patches, labels = self.get_patches(data_array)
+        self.data = torch.tensor(patches)
+        self.labels = torch.tensor(labels)
+        
+    def get_patches(self, data):
+        dt = self.dt
+        size = self.size
+        patch_size = self.patch_size
+        all_patches = []
+        labels = []
+        for i in range(self.n_patches):
+            frame_idx = np.random.randint(0, len(data) - dt)
+            v_idx = np.random.randint(0, size[0] - patch_size[0])
+            h_idx = np.random.randint(0, size[1] - patch_size[1])
+            patch1 = data[frame_idx, v_idx:v_idx+patch_size[0], h_idx:h_idx+patch_size[1]]
+            patch2 = data[frame_idx+dt, v_idx:v_idx+patch_size[0], h_idx:h_idx+patch_size[1]]
+            all_patches.append(patch1)
+            all_patches.append(patch2)
+            labels += [i, i]
+        return np.array(all_patches), np.array(labels)
+        
+    def __getitem__(self, idx):
+        x = self.data[idx]
+        y = self.labels[idx]
+        return x, y
+
+    def __len__(self):
+        return len(self.data)
+
+class NaturalTranslatingImgPrecomputed(Dataset):
+    
+    def __init__(self):
+        path = "/home/sanborn/datasets/translating_natimgs/"
+        self.data = torch.load(path+"data.pt")
+        self.labels = torch.load(path+"labels.pt")
+        
+    def __getitem__(self, idx):
+        x = self.data[idx]
+        y = self.labels[idx]
+        return x, y
+
+    def __len__(self):
+        return len(self.data)
+    
+    
+class NaturalTranslatingImgPrecomputed2(Dataset):
+    
+    def __init__(self):
+        path = "/home/sanborn/datasets/translating_natimgs2/"
+        self.data = torch.load(path+"data.pt")
+        self.labels = torch.load(path+"labels.pt")
+        
+    def __getitem__(self, idx):
+        x = self.data[idx]
+        y = self.labels[idx]
+        return x, y
+
+    def __len__(self):
+        return len(self.data)
+        
+
 class MNIST(Dataset):
     """
     Dataset object for the MNIST dataset.
@@ -46,13 +128,40 @@ class MNIST(Dataset):
         return len(self.data)
     
     
+class NatImgTranslatedMNIST(Dataset):
+
+    def __init__(self):
+
+        super().__init__()
+
+        self.name = "natimg-translatedmnist"
+        self.dim = 36 ** 2
+        self.img_size = (36, 36)
+
+        dataset = torch.load("/home/sanborn/datasets/natimg_translatingmnist.pt")
+        self.data = dataset.data
+        self.labels = dataset.labels
+
+    def __getitem__(self, idx):
+        x = self.data[idx]
+        y = self.labels[idx]
+        return x, y
+
+    def __len__(self):
+        return len(self.data)
+    
+    
 class MNISTExemplars(Dataset):
     """
     Dataset object for the MNIST dataset.
     Takes the MNIST file path, then loads, standardizes, and saves it internally.
     """
 
-    def __init__(self, path, digits=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], n_exemplars=1):
+    def __init__(self, 
+                 path, 
+                 digits=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], 
+                 n_exemplars=1,
+                 digit_labels=True):
 
         super().__init__()
 
@@ -61,6 +170,7 @@ class MNISTExemplars(Dataset):
         self.img_size = (28, 28)
         self.digits = digits
         self.n_exemplars = n_exemplars
+        self.digit_labels = digit_labels
 
         mnist = np.array(pd.read_csv(path))
 
@@ -73,12 +183,17 @@ class MNISTExemplars(Dataset):
         
         exemplar_data = []
         labels = []
+        k = 0
         for d in digits:
             idxs = label_idxs[d]
             random_idxs = np.random.choice(idxs, size=self.n_exemplars, replace=False)
             for i in random_idxs:
                 exemplar_data.append(mnist[i])
-                labels.append(d)
+                if self.digit_labels:
+                    labels.append(d)
+                else:
+                    labels.append(k)
+                k += 1         
             
         self.data = torch.tensor(exemplar_data)
         self.labels = torch.tensor(labels).long()
@@ -158,8 +273,7 @@ class NaturalImagePatches(Dataset):
             n_zeros = 4 - len(str(idx))
             str_idx = "0" * n_zeros + str(idx)
             img = np.asarray(Image.open(directory + "{}.png".format(str_idx)))
-
-            if not color:
+            if not color and len(img.shape) == 3:
                 img = img.mean(axis=-1)
 
             for p in range(patches_per_image):
@@ -169,9 +283,12 @@ class NaturalImagePatches(Dataset):
                 while low_contrast and j < 100:
                     start_x = np.random.randint(0, img_shape[1] - patch_size)
                     start_y = np.random.randint(0, img_shape[0] - patch_size)
-                    patch = img[
-                        start_y : start_y + patch_size, start_x : start_x + patch_size
-                    ]
+                    try:
+                        patch = img[
+                            start_y : start_y + patch_size, start_x : start_x + patch_size
+                        ]
+                    except:
+                        import pdb; pdb.set_trace()
                     if patch.std() >= min_contrast:
                         low_contrast = False
                     j += 1
