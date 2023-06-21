@@ -94,6 +94,22 @@ class CenterMean(Transform):
         if not self.samplewise:
             means = torch.tile(means, (len(data),))
         return transformed_data, labels, tlabels, means
+    
+class ZeroMin(Transform):
+    def __init__(self, samplewise=True):
+        super().__init__()
+        self.name = "zero-min"
+        self.samplewise = samplewise
+
+    def __call__(self, data, labels, tlabels):
+        if self.samplewise:
+            minimum, _ = data.reshape(data.shape[0], -1).min(dim=-1, keepdim=True)
+        else:
+            minimum, _ = data.min()
+        transformed_data = data - minimum.unsqueeze(-1)
+        if not self.samplewise:
+            minimum = torch.tile(minimum, (len(data),))
+        return transformed_data, labels, tlabels, minimum
 
 
 class UnitStd(Transform):
@@ -121,6 +137,23 @@ class UnitStd(Transform):
         if not self.samplewise:
             stds = torch.tile(stds, (len(data),))
         return transformed_data, labels, tlabels, stds
+
+    
+class UnitMax(Transform):
+    def __init__(self, samplewise=True):
+        super().__init__()
+        self.name = "unit-max"
+        self.samplewise = samplewise
+
+    def __call__(self, data, labels, tlabels):
+        if self.samplewise:
+            maxs, _ = data.reshape(data.shape[0], -1).max(dim=-1, keepdim=True)
+        else:
+            maxs, _ = data.max()
+        transformed_data = data / (maxs.unsqueeze(-1) + 1e-10)
+        if not self.samplewise:
+            maxs = torch.tile(maxs, (len(data),))
+        return transformed_data, labels, tlabels, maxs
 
 
 class UniformNoise(Transform):
@@ -284,6 +317,19 @@ class WindowDelete(Transform):
         new_labels = labels
         new_tlabels = tlabels
         return transformed_data, new_labels, new_tlabels, transforms
+    
+    
+class ZeroPad(Transform):
+    
+    def __init__(self, pad=(10, 10, 10, 10)):
+        super().__init__()
+        self.name = "zero-pad"
+        self.pad = pad
+        
+    def __call__(self, data, labels, tlabels):
+        transformed_data = torch.nn.functional.pad(data, self.pad)
+        transforms = [self.pad] * len(transformed_data)
+        return transformed_data, labels, tlabels, transforms
 
 
 class PhaseRotation(Transform):
@@ -1067,3 +1113,28 @@ class OctahedralRotation(Transform):
             transformed_data, new_labels, new_tlabels, transforms
         )
         return transformed_data, new_labels, new_tlabels, transforms
+
+    
+class Translation2D(Transform):
+    
+    def __init__(self, t_min=-10, t_max=10, n_translations=100):
+        super().__init__()
+        self.t_min = t_min
+        self.t_max = t_max
+        self.n_translations = n_translations
+        
+    def __call__(self, data, labels, tlabels):
+        transformed_data = []
+        transforms = []
+        new_labels = []
+        for i, x in enumerate(data):
+            for j in range(self.n_translations):
+                t_h = np.random.randint(self.t_min, self.t_max)
+                t_v = np.random.randint(self.t_min, self.t_max)
+                x_t = torch.roll(x, (t_v, t_h), dims=(0, 1))
+                transformed_data.append(x_t)
+                transforms.append((t_v, t_h))
+                new_labels.append(labels[i])
+        transformed_data = torch.stack(transformed_data)
+        new_labels = torch.stack(new_labels)
+        return transformed_data, new_labels, tlabels, transforms
