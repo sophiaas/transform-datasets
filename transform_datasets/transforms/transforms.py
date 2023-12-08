@@ -9,6 +9,8 @@ import itertools
 from collections import OrderedDict
 from cplxmodule.cplx import Cplx
 import copy
+import pyshtools as pysh
+from sklearn.decomposition import PCA
 
 
 class Transform:
@@ -94,6 +96,19 @@ class CenterMean(Transform):
         if not self.samplewise:
             means = torch.tile(means, (len(data),))
         return transformed_data, labels, tlabels, means
+    
+    
+class PCAWhiten(Transform):
+    def __init__(self):
+        super().__init__()
+        self.name = "pca-whiten"
+
+    def __call__(self, data, labels, tlabels):
+        pca_mod = PCA(whiten=True)
+        whitened_data = torch.tensor(pca_mod.fit_transform(data))
+        transforms = torch.tensor([0] * len(whitened_data))
+        return whitened_data, labels, tlabels, transforms
+    
     
 class ZeroMin(Transform):
     def __init__(self, samplewise=True):
@@ -787,7 +802,6 @@ class SO3(Transform):
         """
         TODO: Currently encountering a bug when input is complex
         """
-        import pyshtools as pysh
 
         super().__init__()
         assert sample_method in [
